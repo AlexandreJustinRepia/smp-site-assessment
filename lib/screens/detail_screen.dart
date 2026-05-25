@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
 import 'form_screen.dart';
@@ -52,7 +56,9 @@ class _DetailScreenState extends State<DetailScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Delete'),
           ),
@@ -72,7 +78,11 @@ class _DetailScreenState extends State<DetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF1B5E20).withValues(alpha: 0.7)),
+          Icon(
+            icon,
+            size: 18,
+            color: const Color(0xFF1B5E20).withValues(alpha: 0.7),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -104,14 +114,21 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
-  Widget _buildSectionCard(String title, IconData headerIcon, List<Widget> children) {
+  Widget _buildSectionCard(
+    String title,
+    IconData headerIcon,
+    List<Widget> children,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border(
-          left: BorderSide(color: const Color(0xFF1B5E20).withValues(alpha: 0.6), width: 4),
+          left: BorderSide(
+            color: const Color(0xFF1B5E20).withValues(alpha: 0.6),
+            width: 4,
+          ),
         ),
         boxShadow: [
           BoxShadow(
@@ -166,7 +183,9 @@ class _DetailScreenState extends State<DetailScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1B5E20).withValues(alpha: 0.2)),
+        border: Border.all(
+          color: const Color(0xFF1B5E20).withValues(alpha: 0.2),
+        ),
       ),
       child: Text(
         label.isNotEmpty ? label : '—',
@@ -179,22 +198,170 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  Future<void> _exportPdf() async {
+    final pdf = pw.Document();
+    final a = _assessment;
+    final inventory = a.inventoryRows;
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) => [
+          // Header
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'BNBNP Site Assessment',
+                style: pw.TextStyle(
+                  fontSize: 24,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Text(
+                'Date: ${a.date}',
+                style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          // Survey Info
+          pw.Text(
+            'Survey Information',
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            cellAlignment: pw.Alignment.centerLeft,
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 12,
+            ),
+            data: [
+              ['Grid No.', a.gridNo],
+              ['Centroid No.', a.centroidNo],
+              ['Elevation', a.elevation],
+              ['Location', a.location],
+              ['Target Coordinates', a.coordsTarget],
+              ['Actual Coordinates', a.coordsActual],
+              ['Team Members', a.teamMembers],
+            ],
+          ),
+          pw.SizedBox(height: 12),
+          // Land Cover
+          pw.Text(
+            'Land Cover / Existing Land-Use: ${a.landCover}',
+            style: pw.TextStyle(fontSize: 14),
+          ),
+          pw.SizedBox(height: 6),
+          // Tree Crown Cover
+          pw.Text(
+            'Tree Crown Cover: ${a.treeCrownCover}',
+            style: pw.TextStyle(fontSize: 14),
+          ),
+          pw.SizedBox(height: 6),
+          // Forest Condition
+          pw.Text(
+            'Forest Condition: ${a.forestCondition}',
+            style: pw.TextStyle(fontSize: 14),
+          ),
+          if (a.forestConditionNotes.isNotEmpty)
+            pw.Text(
+              'Notes: ${a.forestConditionNotes}',
+              style: pw.TextStyle(fontSize: 14),
+            ),
+          pw.SizedBox(height: 6),
+          // Forest Litter
+          pw.Text(
+            'Forest Litter',
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 12,
+            ),
+            data: [
+              ['Ground Cover %', a.forestLitterGroundCover],
+              ['Avg Depth (cm)', a.forestLitterAvgDepth],
+            ],
+          ),
+          pw.SizedBox(height: 6),
+          // Threats
+          pw.Text(
+            'Threats',
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.Text(a.threats, style: pw.TextStyle(fontSize: 14)),
+          pw.SizedBox(height: 6),
+          // Inventory Table
+          pw.Text(
+            'Inventory of Regenerants & Trees',
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.TableHelper.fromTextArray(
+            cellAlignment: pw.Alignment.centerLeft,
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 12,
+            ),
+            data: inventory.isEmpty
+                ? []
+                : inventory
+                      .asMap()
+                      .entries
+                      .map(
+                        (e) => [
+                          '${e.key + 1}',
+                          e.value.species,
+                          e.value.dbh,
+                          e.value.mh,
+                          e.value.th,
+                          e.value.remarks,
+                        ],
+                      )
+                      .toList(),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(30),
+              1: const pw.FlexColumnWidth(),
+              2: const pw.FixedColumnWidth(40),
+              3: const pw.FixedColumnWidth(30),
+              4: const pw.FixedColumnWidth(30),
+              5: const pw.FlexColumnWidth(),
+            },
+          ),
+          pw.SizedBox(height: 6),
+          // Restoration
+          pw.Text(
+            'Recommended Restoration Approaches: ${a.restorationApproach}',
+            style: pw.TextStyle(fontSize: 14),
+          ),
+        ],
+      ),
+    );
+
+    // Show preview / share using printing package
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final a = _assessment;
     final inventory = a.inventoryRows;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          a.gridNo.isNotEmpty ? 'Grid: ${a.gridNo}' : 'Assessment Details',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ),
-        centerTitle: true,
+        title: const Text('Assessment Details'),
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export to PDF',
+            onPressed: _exportPdf,
+          ),
           IconButton(
             icon: const Icon(Icons.edit),
             tooltip: 'Edit',
@@ -225,8 +392,16 @@ class _DetailScreenState extends State<DetailScreen> {
             _buildFieldRow('Elevation', a.elevation, Icons.terrain),
             _buildFieldRow('Date', a.date, Icons.calendar_today),
             _buildFieldRow('Location', a.location, Icons.location_on),
-            _buildFieldRow('Coordinates (Target)', a.coordsTarget, Icons.my_location),
-            _buildFieldRow('Coordinates (Actual)', a.coordsActual, Icons.gps_fixed),
+            _buildFieldRow(
+              'Coordinates (Target)',
+              a.coordsTarget,
+              Icons.my_location,
+            ),
+            _buildFieldRow(
+              'Coordinates (Actual)',
+              a.coordsActual,
+              Icons.gps_fixed,
+            ),
             _buildFieldRow('Team Members', a.teamMembers, Icons.group),
           ]),
 
@@ -251,8 +426,16 @@ class _DetailScreenState extends State<DetailScreen> {
 
           // Forest Litter
           _buildSectionCard('Forest Litter', Icons.grass, [
-            _buildFieldRow('Ground Cover %', a.forestLitterGroundCover, Icons.percent),
-            _buildFieldRow('Average Depth (cm)', a.forestLitterAvgDepth, Icons.straighten),
+            _buildFieldRow(
+              'Ground Cover %',
+              a.forestLitterGroundCover,
+              Icons.percent,
+            ),
+            _buildFieldRow(
+              'Average Depth (cm)',
+              a.forestLitterAvgDepth,
+              Icons.straighten,
+            ),
           ]),
 
           // Threats
@@ -261,47 +444,157 @@ class _DetailScreenState extends State<DetailScreen> {
           ]),
 
           // Inventory
-          _buildSectionCard('Inventory of Regenerants & Trees', Icons.table_chart, [
-            if (inventory.isEmpty)
-              Text('No entries', style: TextStyle(color: Colors.grey.shade400, fontSize: 13))
-            else ...[
-              // Table header
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  children: [
-                    SizedBox(width: 28, child: Text('No.', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
-                    Expanded(flex: 3, child: Text('Species', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
-                    Expanded(flex: 2, child: Text('DBH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
-                    Expanded(flex: 1, child: Text('MH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
-                    Expanded(flex: 1, child: Text('TH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
-                    Expanded(flex: 3, child: Text('Remarks', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              ...List.generate(inventory.length, (i) {
-                final row = inventory[i];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
+          _buildSectionCard(
+            'Inventory of Regenerants & Trees',
+            Icons.table_chart,
+            [
+              if (inventory.isEmpty)
+                const Text(
+                  'No entries',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                )
+              else ...[
+                // Table header
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
                     children: [
-                      SizedBox(width: 28, child: Text('${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF33691E)))),
-                      Expanded(flex: 3, child: Text(row.species.isNotEmpty ? row.species : '—', style: const TextStyle(fontSize: 12))),
-                      Expanded(flex: 2, child: Text(row.dbh.isNotEmpty ? row.dbh : '—', style: const TextStyle(fontSize: 12))),
-                      Expanded(flex: 1, child: Text(row.mh.isNotEmpty ? row.mh : '—', style: const TextStyle(fontSize: 12))),
-                      Expanded(flex: 1, child: Text(row.th.isNotEmpty ? row.th : '—', style: const TextStyle(fontSize: 12))),
-                      Expanded(flex: 3, child: Text(row.remarks.isNotEmpty ? row.remarks : '—', style: const TextStyle(fontSize: 12))),
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          'No.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'Species',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'DBH',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'MH',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'TH',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'Remarks',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1B5E20),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                );
-              }),
+                ),
+                const SizedBox(height: 4),
+                ...List.generate(inventory.length, (i) {
+                  final row = inventory[i];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 28,
+                          child: Text(
+                            '${i + 1}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF33691E),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            row.species.isNotEmpty ? row.species : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            row.dbh.isNotEmpty ? row.dbh : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            row.mh.isNotEmpty ? row.mh : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: Text(
+                            row.th.isNotEmpty ? row.th : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            row.remarks.isNotEmpty ? row.remarks : '—',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
             ],
-          ]),
+          ),
 
           // Restoration
           _buildSectionCard('Recommended Restoration Approaches', Icons.eco, [
