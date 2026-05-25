@@ -37,6 +37,9 @@ dependencies:
   intl: ^0.19.0           # Date formatting
   pdf: ^3.11.1            # PDF generation (fully offline)
   printing: ^5.13.1       # PDF preview / share / save
+  file_picker: ^8.1.2     # Import JSON backup files
+  path_provider: ^2.1.4   # Temporary file path for backups
+  share_plus: ^10.0.2     # Share exported backup files
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
+import '../services/backup_service.dart';
 import 'form_screen.dart';
 import 'detail_screen.dart';
 
@@ -14,6 +15,8 @@ class ListScreen extends StatefulWidget {
 class _ListScreenState extends State<ListScreen> {
   List<Assessment> _assessments = [];
   bool _loading = true;
+  bool _backupBusy = false;
+  final _backupService = BackupService();
 
   @override
   void initState() {
@@ -56,6 +59,55 @@ class _ListScreenState extends State<ListScreen> {
     );
   }
 
+  Future<void> _exportBackup() async {
+    setState(() => _backupBusy = true);
+    try {
+      await _backupService.exportBackup();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Backup exported with ${_assessments.length} record${_assessments.length == 1 ? '' : 's'}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _importBackup() async {
+    setState(() => _backupBusy = true);
+    try {
+      final result = await _backupService.importBackup();
+      if (!mounted) return;
+      if (result == null) {
+        return;
+      }
+      await _loadAssessments();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Imported ${result.imported}; skipped ${result.skipped} duplicate${result.skipped == 1 ? '' : 's'}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Import failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
   String _getLandCoverIcon(String landCover) {
     switch (landCover) {
       case 'Open Forest':
@@ -96,6 +148,18 @@ class _ListScreenState extends State<ListScreen> {
             floating: false,
             pinned: true,
             elevation: 4,
+            actions: [
+              IconButton(
+                onPressed: _backupBusy ? null : _importBackup,
+                icon: const Icon(Icons.upload_file),
+                tooltip: 'Import backup',
+              ),
+              IconButton(
+                onPressed: _backupBusy ? null : _exportBackup,
+                icon: const Icon(Icons.ios_share),
+                tooltip: 'Export backup',
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               title: const Column(
                 mainAxisSize: MainAxisSize.min,
