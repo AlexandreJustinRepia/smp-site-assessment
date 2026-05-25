@@ -1,0 +1,316 @@
+import 'package:flutter/material.dart';
+import '../db/database_helper.dart';
+import '../models/assessment.dart';
+import 'form_screen.dart';
+
+class DetailScreen extends StatefulWidget {
+  final Assessment assessment;
+
+  const DetailScreen({super.key, required this.assessment});
+
+  @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  late Assessment _assessment;
+
+  @override
+  void initState() {
+    super.initState();
+    _assessment = widget.assessment;
+  }
+
+  Future<void> _refresh() async {
+    final updated = await DatabaseHelper.instance.read(_assessment.id!);
+    if (!mounted) return;
+    if (updated != null) {
+      setState(() => _assessment = updated);
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: Colors.red, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Assessment'),
+          ],
+        ),
+        content: const Text('This action cannot be undone. Are you sure?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await DatabaseHelper.instance.delete(_assessment.id!);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    }
+  }
+
+  Widget _buildFieldRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF1B5E20).withValues(alpha: 0.7)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade500,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value.isNotEmpty ? value : '—',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(String title, IconData headerIcon, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(color: const Color(0xFF1B5E20).withValues(alpha: 0.6), width: 4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section title bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B5E20).withValues(alpha: 0.06),
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(12),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(headerIcon, size: 18, color: const Color(0xFFF9A825)),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B5E20).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF1B5E20).withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        label.isNotEmpty ? label : '—',
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF1B5E20),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = _assessment;
+    final inventory = a.inventoryRows;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          a.gridNo.isNotEmpty ? 'Grid: ${a.gridNo}' : 'Assessment Details',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF1B5E20),
+        foregroundColor: Colors.white,
+        elevation: 2,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Edit',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => FormScreen(assessment: a)),
+              );
+              if (!mounted) return;
+              _refresh();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete',
+            onPressed: _delete,
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFFF1F8E9),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Survey Information
+          _buildSectionCard('Survey Information', Icons.info_outline, [
+            _buildFieldRow('Grid No.', a.gridNo, Icons.grid_on),
+            _buildFieldRow('Centroid No.', a.centroidNo, Icons.adjust),
+            _buildFieldRow('Elevation', a.elevation, Icons.terrain),
+            _buildFieldRow('Date', a.date, Icons.calendar_today),
+            _buildFieldRow('Location', a.location, Icons.location_on),
+            _buildFieldRow('Coordinates (Target)', a.coordsTarget, Icons.my_location),
+            _buildFieldRow('Coordinates (Actual)', a.coordsActual, Icons.gps_fixed),
+            _buildFieldRow('Team Members', a.teamMembers, Icons.group),
+          ]),
+
+          // Land Cover
+          _buildSectionCard('Land Cover / Existing Land-Use', Icons.landscape, [
+            _buildChip(a.landCover),
+          ]),
+
+          // Tree Crown Cover
+          _buildSectionCard('Tree Crown Cover', Icons.park, [
+            _buildChip(a.treeCrownCover),
+          ]),
+
+          // Forest Condition
+          _buildSectionCard('Forest Condition', Icons.forest, [
+            _buildChip(a.forestCondition),
+            if (a.forestConditionNotes.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildFieldRow('Notes', a.forestConditionNotes, Icons.edit_note),
+            ],
+          ]),
+
+          // Forest Litter
+          _buildSectionCard('Forest Litter', Icons.grass, [
+            _buildFieldRow('Ground Cover %', a.forestLitterGroundCover, Icons.percent),
+            _buildFieldRow('Average Depth (cm)', a.forestLitterAvgDepth, Icons.straighten),
+          ]),
+
+          // Threats
+          _buildSectionCard('Threats', Icons.warning_amber, [
+            _buildFieldRow('Threats', a.threats, Icons.report_problem),
+          ]),
+
+          // Inventory
+          _buildSectionCard('Inventory of Regenerants & Trees', Icons.table_chart, [
+            if (inventory.isEmpty)
+              Text('No entries', style: TextStyle(color: Colors.grey.shade400, fontSize: 13))
+            else ...[
+              // Table header
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  children: [
+                    SizedBox(width: 28, child: Text('No.', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
+                    Expanded(flex: 3, child: Text('Species', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
+                    Expanded(flex: 2, child: Text('DBH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
+                    Expanded(flex: 1, child: Text('MH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
+                    Expanded(flex: 1, child: Text('TH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
+                    Expanded(flex: 3, child: Text('Remarks', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              ...List.generate(inventory.length, (i) {
+                final row = inventory[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 28, child: Text('${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF33691E)))),
+                      Expanded(flex: 3, child: Text(row.species.isNotEmpty ? row.species : '—', style: const TextStyle(fontSize: 12))),
+                      Expanded(flex: 2, child: Text(row.dbh.isNotEmpty ? row.dbh : '—', style: const TextStyle(fontSize: 12))),
+                      Expanded(flex: 1, child: Text(row.mh.isNotEmpty ? row.mh : '—', style: const TextStyle(fontSize: 12))),
+                      Expanded(flex: 1, child: Text(row.th.isNotEmpty ? row.th : '—', style: const TextStyle(fontSize: 12))),
+                      Expanded(flex: 3, child: Text(row.remarks.isNotEmpty ? row.remarks : '—', style: const TextStyle(fontSize: 12))),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ]),
+
+          // Restoration
+          _buildSectionCard('Recommended Restoration Approaches', Icons.eco, [
+            _buildChip(a.restorationApproach),
+          ]),
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
