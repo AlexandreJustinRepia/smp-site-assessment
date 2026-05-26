@@ -48,6 +48,18 @@ class FormRadioGrid extends StatelessWidget {
         return Icons.terrain;
       case 'Inland Water':
         return Icons.water;
+      case 'Assisted Natural Regeneration (ANR)':
+        return Icons.auto_awesome;
+      case 'Miyawaki Method':
+        return Icons.grain;
+      case 'Enrichment Planting':
+        return Icons.forest;
+      case 'Ecological Mangrove Restoration':
+        return Icons.water;
+      case 'Rainforestation Farming':
+        return Icons.spa;
+      case 'Natural Recovery':
+        return Icons.restore;
       default:
         return Icons.more_horiz;
     }

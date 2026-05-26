@@ -41,7 +41,6 @@ dependencies:
   share_plus: ^10.0.2     # Share exported backup files
   google_fonts: ^6.2.1
   geolocator: ^11.0.0
-  speech_to_text: ^6.5.0
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
@@ -34,15 +33,11 @@ class _FormScreenState extends State<FormScreen> {
   late TextEditingController _coordsTargetCtrl;
   late TextEditingController _coordsActualCtrl;
   late TextEditingController _teamMembersCtrl;
-  late TextEditingController _forestConditionNotesCtrl;
   late TextEditingController _litterGroundCoverCtrl;
   late TextEditingController _litterAvgDepthCtrl;
   late TextEditingController _threatsCtrl;
 
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
-
-  List<InventoryRow> _inventoryRows = [];
+  List<Map<String, String>> _inventoryRows = [];
 
   bool get _isEditing => widget.assessment != null;
   String? _landCover;
@@ -72,11 +67,11 @@ class _FormScreenState extends State<FormScreen> {
 
   static const _forestConditionOptions = [
     'Old Growth Forest',
-    'Residual Forest',
+    'Advance Secondary Growth Forest',
+    'Early Secondary Growth Forest',
     'Industrial Forest Plantation',
-    'Community-Based Forest',
-    'Agroforestry',
-    'Degraded Forest',
+    'Open, Uncultivated Area',
+    'Open, Cultivated Area',
   ];
 
   static const _restorationOptions = [
@@ -101,9 +96,6 @@ class _FormScreenState extends State<FormScreen> {
     _coordsTargetCtrl = TextEditingController(text: a?.coordsTarget ?? '');
     _coordsActualCtrl = TextEditingController(text: a?.coordsActual ?? '');
     _teamMembersCtrl = TextEditingController(text: a?.teamMembers ?? '');
-    _forestConditionNotesCtrl = TextEditingController(
-      text: a?.forestConditionNotes ?? '',
-    );
     _litterGroundCoverCtrl = TextEditingController(
       text: a?.forestLitterGroundCover ?? '',
     );
@@ -111,8 +103,6 @@ class _FormScreenState extends State<FormScreen> {
       text: a?.forestLitterAvgDepth ?? '',
     );
     _threatsCtrl = TextEditingController(text: a?.threats ?? '');
-
-    _speech = stt.SpeechToText();
 
     _gridNoCtrl.addListener(_onCtrlChanged);
     _dateCtrl.addListener(_onCtrlChanged);
@@ -129,7 +119,20 @@ class _FormScreenState extends State<FormScreen> {
     _restorationApproach = (a != null && a.restorationApproach.isNotEmpty)
         ? a.restorationApproach
         : null;
-    _inventoryRows = a?.inventoryRows ?? [InventoryRow()];
+    _inventoryRows =
+        a?.inventoryRows
+            .map(
+              (row) => {
+                'id': '${row.species}_${row.dbh}_${UniqueKey()}',
+                'species': row.species,
+                'dbh': row.dbh,
+                'mh': row.mh,
+                'th': row.th,
+                'remarks': row.remarks,
+              },
+            )
+            .toList() ??
+        [_emptyInventoryRow()];
   }
 
   @override
@@ -147,7 +150,6 @@ class _FormScreenState extends State<FormScreen> {
     _coordsTargetCtrl.dispose();
     _coordsActualCtrl.dispose();
     _teamMembersCtrl.dispose();
-    _forestConditionNotesCtrl.dispose();
     _litterGroundCoverCtrl.dispose();
     _litterAvgDepthCtrl.dispose();
     _threatsCtrl.dispose();
@@ -189,27 +191,6 @@ class _FormScreenState extends State<FormScreen> {
         borderSide: const BorderSide(color: Color(0xFF1B5E20), width: 1.5),
       ),
     );
-  }
-
-  Future<void> _listenForestConditionNotes() async {
-    if (!_isListening) {
-      final available = await _speech.initialize();
-      if (!available) return;
-
-      _speech.listen(
-        onResult: (val) {
-          setState(() {
-            _forestConditionNotesCtrl.text +=
-                (_forestConditionNotesCtrl.text.isEmpty ? '' : ' ') +
-                val.recognizedWords;
-          });
-        },
-      );
-      setState(() => _isListening = true);
-    } else {
-      await _speech.stop();
-      setState(() => _isListening = false);
-    }
   }
 
   Future<void> _pickDate() async {
@@ -270,13 +251,26 @@ class _FormScreenState extends State<FormScreen> {
       landCover: _landCover ?? '',
       treeCrownCover: _treeCrownCover ?? '',
       forestCondition: _forestCondition ?? '',
-      forestConditionNotes: _forestConditionNotesCtrl.text.trim(),
+      forestConditionNotes: '',
       forestLitterGroundCover: _litterGroundCoverCtrl.text.trim(),
       forestLitterAvgDepth: _litterAvgDepthCtrl.text.trim(),
       threats: _threatsCtrl.text.trim(),
       restorationApproach: _restorationApproach ?? '',
+      restorationRationale: '',
     );
-    assessment.setInventoryRows(_inventoryRows);
+    assessment.setInventoryRows(
+      _inventoryRows
+          .map(
+            (row) => InventoryRow(
+              species: row['species'] ?? '',
+              dbh: row['dbh'] ?? '',
+              mh: row['mh'] ?? '',
+              th: row['th'] ?? '',
+              remarks: row['remarks'] ?? '',
+            ),
+          )
+          .toList(),
+    );
 
     if (_isEditing) {
       await DatabaseHelper.instance.update(assessment);
@@ -297,6 +291,15 @@ class _FormScreenState extends State<FormScreen> {
     );
     Navigator.pop(context, true);
   }
+
+  Map<String, String> _emptyInventoryRow() => {
+    'id': UniqueKey().toString(),
+    'species': '',
+    'dbh': '',
+    'mh': '',
+    'th': '',
+    'remarks': '',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -393,10 +396,6 @@ class _FormScreenState extends State<FormScreen> {
                     selectedValue: _forestCondition,
                     options: _forestConditionOptions,
                     onChanged: (v) => setState(() => _forestCondition = v),
-                    notesCtrl: _forestConditionNotesCtrl,
-                    inputDecoration: _inputDecoration,
-                    isListening: _isListening,
-                    onListen: _listenForestConditionNotes,
                   ),
                   const SizedBox(height: 20),
                   ForestLitterSection(

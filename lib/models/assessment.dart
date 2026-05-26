@@ -67,6 +67,7 @@ class Assessment {
 
   // Section H – Recommended Restoration Approach (radio, one of 6)
   String restorationApproach;
+  String restorationRationale;
 
   Assessment({
     this.id,
@@ -87,6 +88,7 @@ class Assessment {
     this.threats = '',
     this.inventoryJson = '[]',
     this.restorationApproach = '',
+    this.restorationRationale = '',
   });
 
   List<InventoryRow> get inventoryRows {
@@ -117,6 +119,7 @@ class Assessment {
         'threats': threats,
         'inventoryJson': inventoryJson,
         'restorationApproach': restorationApproach,
+        'restorationRationale': restorationRationale,
       };
 
   factory Assessment.fromMap(Map<String, dynamic> map) => Assessment(
@@ -138,6 +141,7 @@ class Assessment {
         threats: map['threats'] ?? '',
         inventoryJson: map['inventoryJson'] ?? '[]',
         restorationApproach: map['restorationApproach'] ?? '',
+        restorationRationale: map['restorationRationale'] ?? '',
       );
 
   Assessment copyWith({
@@ -159,6 +163,7 @@ class Assessment {
     String? threats,
     String? inventoryJson,
     String? restorationApproach,
+    String? restorationRationale,
   }) =>
       Assessment(
         id: id ?? this.id,
@@ -179,5 +184,6 @@ class Assessment {
         threats: threats ?? this.threats,
         inventoryJson: inventoryJson ?? this.inventoryJson,
         restorationApproach: restorationApproach ?? this.restorationApproach,
+        restorationRationale: restorationRationale ?? this.restorationRationale,
       );
 }

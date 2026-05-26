@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../widgets/radio_group.dart' show CustomRadioGroup;
 import '../../widgets/section_header.dart';
+import 'radio_grid.dart';
 
 class RestorationSection extends StatelessWidget {
   final String? selectedValue;
   final List<String> options;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<String> onChanged;
 
   const RestorationSection({
     super.key,
@@ -25,10 +25,9 @@ class RestorationSection extends StatelessWidget {
           icon: Icons.eco,
         ),
         const SizedBox(height: 8),
-        CustomRadioGroup(
+        FormRadioGrid(
           selectedValue: selectedValue,
           options: options,
-          crossAxisCount: 2,
           onChanged: onChanged,
         ),
       ],
