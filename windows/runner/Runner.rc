@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "smp_site_assessment" "\0"
+            VALUE "FileDescription", "SMP Site Assessment" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "smp_site_assessment" "\0"
+            VALUE "InternalName", "SMP Site Assessment" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
             VALUE "OriginalFilename", "smp_site_assessment.exe" "\0"
-            VALUE "ProductName", "smp_site_assessment" "\0"
+            VALUE "ProductName", "SMP Site Assessment" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

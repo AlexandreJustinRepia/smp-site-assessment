@@ -204,7 +204,7 @@ class _ListScreenState extends State<ListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Site Assessment',
+                    'SMP Site Assessment',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -213,7 +213,7 @@ class _ListScreenState extends State<ListScreen> {
                     ),
                   ),
                   Text(
-                    'Biak-Na-Bato National Park',
+                    'Site Monitoring Platform',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w400,
@@ -262,22 +262,23 @@ class _ListScreenState extends State<ListScreen> {
                         ),
                       ),
                     ),
-                    // DENR / NGP branding
+                    // App branding
                     Positioned(
                       top: 50,
                       left: 16,
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            width: 48,
+                            height: 48,
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(
-                              Icons.eco,
-                              color: Color(0xFFF9A825),
-                              size: 28,
+                            child: Image.asset(
+                              'assets/images/logo/logo.png',
+                              fit: BoxFit.contain,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -285,7 +286,7 @@ class _ListScreenState extends State<ListScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'DENR',
+                                'SMP',
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 13,
@@ -294,7 +295,7 @@ class _ListScreenState extends State<ListScreen> {
                                 ),
                               ),
                               Text(
-                                'National Greening Program',
+                                'Site Assessment',
                                 style: TextStyle(
                                   color: Color(0xFFF9A825).withValues(alpha: 0.85),
                                   fontSize: 11,

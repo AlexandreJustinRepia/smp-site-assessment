@@ -18,6 +18,7 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   late Assessment _assessment;
+  bool _exportingPdf = false;
 
   @override
   void initState() {
@@ -199,20 +200,24 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _exportPdf() async {
+    if (_exportingPdf) return;
+    setState(() => _exportingPdf = true);
+
     final pdf = pw.Document();
     final a = _assessment;
     final inventory = a.inventoryRows;
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (pw.Context context) => [
+    try {
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) => [
           // Header
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text(
-                'BNBNP Site Assessment',
+                'SMP Site Assessment',
                 style: pw.TextStyle(
                   fontSize: 24,
                   fontWeight: pw.FontWeight.bold,
@@ -336,13 +341,105 @@ class _DetailScreenState extends State<DetailScreen> {
             'Recommended Restoration Approaches: ${a.restorationApproach}',
             style: pw.TextStyle(fontSize: 14),
           ),
+          ],
+        ),
+      );
+
+      // Show preview / share using printing package
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+    } finally {
+      if (mounted) setState(() => _exportingPdf = false);
+    }
+  }
+
+  Widget _buildPdfExportPanel() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B5E20),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-    );
-
-    // Show preview / share using printing package
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.picture_as_pdf,
+              color: Color(0xFFF9A825),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PDF Report',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Preview, print, or share this assessment',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFFA5D6A7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: _exportingPdf ? null : _exportPdf,
+            icon: _exportingPdf
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.ios_share, size: 18),
+            label: Text(_exportingPdf ? 'Preparing' : 'Export'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF9A825),
+              disabledBackgroundColor: const Color(0xFFF9A825).withValues(
+                alpha: 0.55,
+              ),
+              foregroundColor: const Color(0xFF1B5E20),
+              disabledForegroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -358,9 +455,18 @@ class _DetailScreenState extends State<DetailScreen> {
         elevation: 2,
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
+            icon: _exportingPdf
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.picture_as_pdf),
             tooltip: 'Export to PDF',
-            onPressed: _exportPdf,
+            onPressed: _exportingPdf ? null : _exportPdf,
           ),
           IconButton(
             icon: const Icon(Icons.edit),
@@ -385,6 +491,8 @@ class _DetailScreenState extends State<DetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _buildPdfExportPanel(),
+
           // Survey Information
           _buildSectionCard('Survey Information', Icons.info_outline, [
             _buildFieldRow('Grid No.', a.gridNo, Icons.grid_on),

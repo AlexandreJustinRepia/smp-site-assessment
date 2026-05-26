@@ -1,11 +1,11 @@
 {
-    "name": "smp_site_assessment",
-    "short_name": "smp_site_assessment",
+    "name": "SMP Site Assessment",
+    "short_name": "SMP Site",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "SMP Site Assessment",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,4 +1,4 @@
-# smp_site_assessment
+# SMP Site Assessment
 
 A new Flutter project.
 
