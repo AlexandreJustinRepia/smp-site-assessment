@@ -144,11 +144,16 @@ class _FormScreenState extends State<FormScreen> {
     super.dispose();
   }
 
-  InputDecoration _inputDecoration(String label, {IconData? icon}) {
+
+
+  InputDecoration _inputDecoration(String label, {IconData? icon, Widget? suffix, String? hintText}) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF558B2F)),
       prefixIcon: icon != null ? Icon(icon, size: 20, color: const Color(0xFF1B5E20)) : null,
+      suffixIcon: suffix,
+      hintText: hintText,
+      hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
       filled: true,
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -305,11 +310,14 @@ class _FormScreenState extends State<FormScreen> {
             child: Form(
               key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
           children: [
             // ── SECTION A: Header Information ──
             const SectionHeader(title: 'Survey Information', icon: Icons.info_outline),
             const SizedBox(height: 8),
+
+
+
             // Row: Grid No, Centroid No
             Row(
               children: [
@@ -339,6 +347,7 @@ class _FormScreenState extends State<FormScreen> {
                 Expanded(
                   child: TextFormField(
                       controller: _elevationCtrl,
+                      keyboardType: TextInputType.number,
                       decoration: _inputDecoration('Elevation', icon: Icons.terrain),
                       validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       style: const TextStyle(fontSize: 14),
@@ -346,13 +355,30 @@ class _FormScreenState extends State<FormScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextFormField(
-                      controller: _dateCtrl,
-                      readOnly: true,
-                      onTap: _pickDate,
-                      decoration: _inputDecoration('Date', icon: Icons.calendar_today),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      style: const TextStyle(fontSize: 14),
+                  child: FormField<String>(
+                    initialValue: _dateCtrl.text,
+                    validator: (value) => _dateCtrl.text.isEmpty ? 'Required' : null,
+                    builder: (FormFieldState<String> state) {
+                      return InkWell(
+                        onTap: () async {
+                          await _pickDate();
+                          state.didChange(_dateCtrl.text);
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: InputDecorator(
+                          decoration: _inputDecoration('Date', icon: Icons.calendar_today).copyWith(
+                            errorText: state.errorText,
+                          ),
+                          child: Text(
+                            _dateCtrl.text.isEmpty ? 'Select Date' : _dateCtrl.text,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _dateCtrl.text.isEmpty ? Colors.grey.shade600 : Colors.black87,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -360,7 +386,7 @@ class _FormScreenState extends State<FormScreen> {
             const SizedBox(height: 12),
             TextFormField(
                controller: _locationCtrl,
-               decoration: _inputDecoration('Location', icon: Icons.location_on),
+               decoration: _inputDecoration('Location', icon: Icons.place),
                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                style: const TextStyle(fontSize: 14),
             ),
@@ -381,7 +407,11 @@ class _FormScreenState extends State<FormScreen> {
             const SizedBox(height: 12),
             TextFormField(
                 controller: _teamMembersCtrl,
-                decoration: _inputDecoration('Team Members', icon: Icons.group),
+                decoration: _inputDecoration(
+                  'Team Members',
+                  icon: Icons.group,
+                  hintText: 'Enter names separated by comma',
+                ),
                 validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                 maxLines: 2,
                 style: const TextStyle(fontSize: 14),
