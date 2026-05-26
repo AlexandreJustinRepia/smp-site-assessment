@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
-import '../widgets/section_header.dart';
-import '../widgets/radio_group.dart' show CustomRadioGroup;
-import '../widgets/tree_inventory_table.dart';
+import 'form_sections/forest_condition_section.dart';
+import 'form_sections/forest_litter_section.dart';
+import 'form_sections/inventory_section.dart';
+import 'form_sections/land_cover_section.dart';
+import 'form_sections/restoration_section.dart';
+import 'form_sections/survey_information_section.dart';
+import 'form_sections/threats_section.dart';
+import 'form_sections/tree_crown_cover_section.dart';
 
 class FormScreen extends StatefulWidget {
-  final Assessment? assessment; // null = create, non-null = edit
+  final Assessment? assessment;
 
   const FormScreen({super.key, this.assessment});
 
@@ -20,7 +26,6 @@ class _FormScreenState extends State<FormScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
-  // Header controllers
   late TextEditingController _gridNoCtrl;
   late TextEditingController _centroidNoCtrl;
   late TextEditingController _elevationCtrl;
@@ -29,21 +34,14 @@ class _FormScreenState extends State<FormScreen> {
   late TextEditingController _coordsTargetCtrl;
   late TextEditingController _coordsActualCtrl;
   late TextEditingController _teamMembersCtrl;
+  late TextEditingController _forestConditionNotesCtrl;
+  late TextEditingController _litterGroundCoverCtrl;
+  late TextEditingController _litterAvgDepthCtrl;
+  late TextEditingController _threatsCtrl;
 
   late stt.SpeechToText _speech;
   bool _isListening = false;
 
-  // Forest condition notes controller
-  late TextEditingController _forestConditionNotesCtrl;
-
-  // Forest litter controllers
-  late TextEditingController _litterGroundCoverCtrl;
-  late TextEditingController _litterAvgDepthCtrl;
-
-  // Threats
-  late TextEditingController _threatsCtrl;
-
-  // Inventory
   List<InventoryRow> _inventoryRows = [];
 
   bool get _isEditing => widget.assessment != null;
@@ -52,7 +50,6 @@ class _FormScreenState extends State<FormScreen> {
   String? _forestCondition;
   String? _restorationApproach;
 
-  // Land cover options
   static const _landCoverOptions = [
     'Open Forest',
     'Annual Crop',
@@ -67,14 +64,12 @@ class _FormScreenState extends State<FormScreen> {
     'Inland Water',
   ];
 
-  // Tree crown cover options
   static const _treeCrownCoverOptions = [
-    'Closed Forest (≥40%)',
+    'Closed Forest (>=40%)',
     'Open Forest (10-39%)',
     'Non-Forest (<10%)',
   ];
 
-  // Forest condition options
   static const _forestConditionOptions = [
     'Old Growth Forest',
     'Residual Forest',
@@ -84,7 +79,6 @@ class _FormScreenState extends State<FormScreen> {
     'Degraded Forest',
   ];
 
-  // Restoration options
   static const _restorationOptions = [
     'Assisted Natural Regeneration (ANR)',
     'Miyawaki Method',
@@ -93,10 +87,6 @@ class _FormScreenState extends State<FormScreen> {
     'Rainforestation Farming',
     'Natural Recovery',
   ];
-
-  void _onCtrlChanged() {
-    if (mounted) setState(() {});
-  }
 
   @override
   void initState() {
@@ -111,8 +101,6 @@ class _FormScreenState extends State<FormScreen> {
     _coordsTargetCtrl = TextEditingController(text: a?.coordsTarget ?? '');
     _coordsActualCtrl = TextEditingController(text: a?.coordsActual ?? '');
     _teamMembersCtrl = TextEditingController(text: a?.teamMembers ?? '');
-    _speech = stt.SpeechToText();
-    _isListening = false;
     _forestConditionNotesCtrl = TextEditingController(
       text: a?.forestConditionNotes ?? '',
     );
@@ -124,8 +112,12 @@ class _FormScreenState extends State<FormScreen> {
     );
     _threatsCtrl = TextEditingController(text: a?.threats ?? '');
 
+    _speech = stt.SpeechToText();
+
     _gridNoCtrl.addListener(_onCtrlChanged);
     _dateCtrl.addListener(_onCtrlChanged);
+    _litterGroundCoverCtrl.addListener(_onCtrlChanged);
+    _litterAvgDepthCtrl.addListener(_onCtrlChanged);
 
     _landCover = (a != null && a.landCover.isNotEmpty) ? a.landCover : null;
     _treeCrownCover = (a != null && a.treeCrownCover.isNotEmpty)
@@ -137,7 +129,6 @@ class _FormScreenState extends State<FormScreen> {
     _restorationApproach = (a != null && a.restorationApproach.isNotEmpty)
         ? a.restorationApproach
         : null;
-
     _inventoryRows = a?.inventoryRows ?? [InventoryRow()];
   }
 
@@ -145,6 +136,9 @@ class _FormScreenState extends State<FormScreen> {
   void dispose() {
     _gridNoCtrl.removeListener(_onCtrlChanged);
     _dateCtrl.removeListener(_onCtrlChanged);
+    _litterGroundCoverCtrl.removeListener(_onCtrlChanged);
+    _litterAvgDepthCtrl.removeListener(_onCtrlChanged);
+
     _gridNoCtrl.dispose();
     _centroidNoCtrl.dispose();
     _elevationCtrl.dispose();
@@ -158,6 +152,10 @@ class _FormScreenState extends State<FormScreen> {
     _litterAvgDepthCtrl.dispose();
     _threatsCtrl.dispose();
     super.dispose();
+  }
+
+  void _onCtrlChanged() {
+    if (mounted) setState(() {});
   }
 
   InputDecoration _inputDecoration(
@@ -195,17 +193,19 @@ class _FormScreenState extends State<FormScreen> {
 
   Future<void> _listenForestConditionNotes() async {
     if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        _speech.listen(onResult: (val) {
+      final available = await _speech.initialize();
+      if (!available) return;
+
+      _speech.listen(
+        onResult: (val) {
           setState(() {
             _forestConditionNotesCtrl.text +=
-                ( _forestConditionNotesCtrl.text.isEmpty ? '' : ' ' ) +
+                (_forestConditionNotesCtrl.text.isEmpty ? '' : ' ') +
                 val.recognizedWords;
           });
-        });
-        setState(() => _isListening = true);
-      }
+        },
+      );
+      setState(() => _isListening = true);
     } else {
       await _speech.stop();
       setState(() => _isListening = false);
@@ -233,6 +233,7 @@ class _FormScreenState extends State<FormScreen> {
         );
       },
     );
+
     if (picked != null) {
       _dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
     }
@@ -240,7 +241,6 @@ class _FormScreenState extends State<FormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    // Ensure all required radio selections are made
     if (_landCover == null ||
         _treeCrownCover == null ||
         _forestCondition == null ||
@@ -254,6 +254,7 @@ class _FormScreenState extends State<FormScreen> {
       );
       return;
     }
+
     setState(() => _saving = true);
 
     final assessment = Assessment(
@@ -302,7 +303,7 @@ class _FormScreenState extends State<FormScreen> {
     final gridNo = _gridNoCtrl.text.trim();
     final date = _dateCtrl.text.trim();
     final breadcrumbText =
-        "DENR Field Survey  ›  Grid ${gridNo.isEmpty ? '—' : gridNo}  ›  ${date.isEmpty ? '—' : date}";
+        "DENR Field Survey > Grid ${gridNo.isEmpty ? '-' : gridNo} > ${date.isEmpty ? '-' : date}";
 
     return Scaffold(
       appBar: AppBar(
@@ -363,349 +364,62 @@ class _FormScreenState extends State<FormScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
                 children: [
-                  // ── SECTION A: Header Information ──
-                  const SectionHeader(
-                    title: 'Survey Information',
-                    icon: Icons.info_outline,
+                  SurveyInformationSection(
+                    gridNoCtrl: _gridNoCtrl,
+                    centroidNoCtrl: _centroidNoCtrl,
+                    elevationCtrl: _elevationCtrl,
+                    dateCtrl: _dateCtrl,
+                    locationCtrl: _locationCtrl,
+                    coordsTargetCtrl: _coordsTargetCtrl,
+                    coordsActualCtrl: _coordsActualCtrl,
+                    teamMembersCtrl: _teamMembersCtrl,
+                    inputDecoration: _inputDecoration,
+                    onPickDate: _pickDate,
                   ),
-                  const SizedBox(height: 8),
-
-                  // Row: Grid No, Centroid No
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _gridNoCtrl,
-                          decoration: _inputDecoration(
-                            'Grid No.',
-                            icon: Icons.grid_on,
-                          ),
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Required'
-                              : null,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _centroidNoCtrl,
-                          decoration: _inputDecoration(
-                            'Centroid No.',
-                            icon: Icons.adjust,
-                          ),
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Required'
-                              : null,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Row: Elevation, Date
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _elevationCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: _inputDecoration(
-                            'Elevation',
-                            icon: Icons.terrain,
-                          ),
-                          validator: (value) => value == null || value.isEmpty
-                              ? 'Required'
-                              : null,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FormField<String>(
-                          initialValue: _dateCtrl.text,
-                          validator: (value) =>
-                              _dateCtrl.text.isEmpty ? 'Required' : null,
-                          builder: (FormFieldState<String> state) {
-                            return InkWell(
-                              onTap: () async {
-                                await _pickDate();
-                                state.didChange(_dateCtrl.text);
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: InputDecorator(
-                                decoration: _inputDecoration(
-                                  'Date',
-                                  icon: Icons.calendar_today,
-                                ).copyWith(errorText: state.errorText),
-                                child: Text(
-                                  _dateCtrl.text.isEmpty
-                                      ? 'Select Date'
-                                      : _dateCtrl.text,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _dateCtrl.text.isEmpty
-                                        ? Colors.grey.shade600
-                                        : Colors.black87,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _locationCtrl,
-                    decoration: _inputDecoration('Location', icon: Icons.place),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _coordsTargetCtrl,
-                    decoration: _inputDecoration(
-                      'Coordinates (Target)',
-                      icon: Icons.my_location,
-                    ),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _coordsActualCtrl,
-                    decoration: _inputDecoration(
-                      'Coordinates (Actual)',
-                      icon: Icons.gps_fixed,
-                    ),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _teamMembersCtrl,
-                    decoration: _inputDecoration(
-                      'Team Members',
-                      icon: Icons.group,
-                      hintText: 'Enter names separated by comma',
-                    ),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-
-                  // ── SECTION B: Land Cover (Radio) ──
-                  const SectionHeader(
-                    title: 'Land Cover / Existing Land-Use',
-                    icon: Icons.landscape,
-                  ),
-                  const SizedBox(height: 8),
-                  _RadioGridWidget(
+                  const SizedBox(height: 20),
+                  LandCoverSection(
                     selectedValue: _landCover,
                     options: _landCoverOptions,
                     onChanged: (v) => setState(() => _landCover = v),
                   ),
-
-                  // ── SECTION C: Tree Crown Cover (Radio) ──
-                  const SectionHeader(
-                    title: 'Tree Crown Cover',
-                    icon: Icons.park,
+                  const SizedBox(height: 20),
+                  TreeCrownCoverSection(
+                    selectedValue: _treeCrownCover,
+                    options: _treeCrownCoverOptions,
+                    onChanged: (v) => setState(() => _treeCrownCover = v),
                   ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Row(
-                      children: List.generate(_treeCrownCoverOptions.length, (index) {
-                        final option = _treeCrownCoverOptions[index];
-                        final isSelected = _treeCrownCover == option;
-                        // Color palettes matching the three segments; use modulo to avoid out-of-range if list length varies
-                        final List<Color> unselectedColors = const [
-                          Color(0xFFFFCDD2),
-                          Color(0xFFFFE0B2),
-                          Color(0xFFC8E6C9),
-                        ];
-                        final List<Color> selectedColors = const [
-                          Color(0xFFC62828),
-                          Color(0xFFE65100),
-                          Color(0xFF2E7D32),
-                        ];
-                        final bgColor = isSelected
-                            ? selectedColors[index % selectedColors.length]
-                            : unselectedColors[index % unselectedColors.length];
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _treeCrownCover = option),
-                            child: Container(
-                              height: 56,
-                              color: bgColor,
-                              alignment: Alignment.center,
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isSelected)
-                                      const Icon(Icons.check, color: Colors.white, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      option,
-                                      style: TextStyle(
-                                        color: isSelected ? Colors.white : Colors.black87,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                  // Descriptive text for selected option
-                  if (_treeCrownCover != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _treeCrownCover!,
-                        style: const TextStyle(color: Colors.black87),
-                      ),
-                    ),
-
-                  // ── SECTION D: Forest Condition (Radio + Notes) ──
-                  const SectionHeader(
-                    title: 'Forest Condition',
-                    icon: Icons.forest,
-                  ),
-                  const SizedBox(height: 8),
-                  _RadioGridWidget(
+                  const SizedBox(height: 20),
+                  ForestConditionSection(
                     selectedValue: _forestCondition,
                     options: _forestConditionOptions,
                     onChanged: (v) => setState(() => _forestCondition = v),
+                    notesCtrl: _forestConditionNotesCtrl,
+                    inputDecoration: _inputDecoration,
+                    isListening: _isListening,
+                    onListen: _listenForestConditionNotes,
                   ),
-
-                  // ── SECTION E: Forest Litter (Fillable) ──
-                  const SectionHeader(
-                    title: 'Forest Litter',
-                    icon: Icons.grass,
+                  const SizedBox(height: 20),
+                  ForestLitterSection(
+                    groundCoverCtrl: _litterGroundCoverCtrl,
+                    avgDepthCtrl: _litterAvgDepthCtrl,
+                    inputDecoration: _inputDecoration,
                   ),
-                  const SizedBox(height: 8),
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _litterGroundCoverCtrl,
-                              decoration: _inputDecoration(
-                                'Ground Cover %',
-                                icon: Icons.percent,
-                              ),
-                              validator: (value) =>
-                                  value == null || value.isEmpty
-                                  ? 'Required'
-                                  : null,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _litterAvgDepthCtrl,
-                              decoration: _inputDecoration(
-                                'Avg Depth (cm)',
-                                icon: Icons.straighten,
-                              ),
-                              validator: (value) =>
-                                  value == null || value.isEmpty
-                                  ? 'Required'
-                                  : null,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  const SizedBox(height: 20),
+                  ThreatsSection(
+                    threatsCtrl: _threatsCtrl,
+                    inputDecoration: _inputDecoration,
                   ),
-
-                  // ── SECTION F: Threats ──
-                  const SectionHeader(
-                    title: 'Threats',
-                    icon: Icons.warning_amber,
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _threatsCtrl,
-                    decoration: _inputDecoration(
-                      'Describe any threats observed',
-                      icon: Icons.report_problem,
-                    ),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                    maxLines: 3,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-
-                  // ── SECTION G: Inventory ──
-                  const SectionHeader(
-                    title: 'Inventory of Regenerants & Existing Trees',
-                    icon: Icons.table_chart,
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9A825).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Saplings (5–14 cm diameter) and Trees (≥ 15 cm diameter)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF33691E),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TreeInventoryTable(
+                  const SizedBox(height: 20),
+                  InventorySection(
                     rows: _inventoryRows,
                     onChanged: (rows) => setState(() => _inventoryRows = rows),
                   ),
-
-                  // ── SECTION H: Restoration Approaches (Radio) ──
-                  const SectionHeader(
-                    title: 'Recommended Restoration Approaches',
-                    icon: Icons.eco,
-                  ),
-                  const SizedBox(height: 8),
-                  CustomRadioGroup(
+                  const SizedBox(height: 20),
+                  RestorationSection(
                     selectedValue: _restorationApproach,
                     options: _restorationOptions,
-                    crossAxisCount: 2,
                     onChanged: (v) => setState(() => _restorationApproach = v),
                   ),
-
                   const SizedBox(height: 32),
                 ],
               ),
@@ -713,7 +427,6 @@ class _FormScreenState extends State<FormScreen> {
           ),
         ],
       ),
-      // Save button at bottom
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         decoration: BoxDecoration(
@@ -759,159 +472,6 @@ class _FormScreenState extends State<FormScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _RadioGridWidget extends StatelessWidget {
-  final String? selectedValue;
-  final List<String> options;
-  final ValueChanged<String> onChanged;
-
-  const _RadioGridWidget({
-    required this.selectedValue,
-    required this.options,
-    required this.onChanged,
-  });
-
-  IconData _getIconForOption(String option) {
-    switch (option) {
-      case 'Old Growth Forest':
-        return Icons.park;
-      case 'Industrial Forest Plantation':
-        return Icons.precision_manufacturing;
-      case 'Community-Based Forest':
-        return Icons.people;
-      case 'Agroforestry':
-        return Icons.spa;
-      case 'Degraded Forest':
-        return Icons.warning_amber;
-      case 'Residual Forest':
-        return Icons.nature;
-      // Existing mappings fall through
-      case 'Open Forest':
-        return Icons.forest;
-      case 'Annual Crop':
-        return Icons.agriculture;
-      case 'Built-up':
-        return Icons.home_work;
-      case 'Monoculture':
-        return Icons.agriculture;
-      case 'Brushland/Shrub':
-        return Icons.nature;
-      case 'Perennial Crop':
-        return Icons.agriculture;
-      case 'Fishpond':
-        return Icons.water;
-      case 'Plantation':
-        return Icons.forest;
-      case 'Grassland':
-        return Icons.grass;
-      case 'Open/Barren':
-        return Icons.terrain;
-      case 'Inland Water':
-        return Icons.water;
-      default:
-        return Icons.more_horiz;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Calculate item width for a 2-column grid inside Wrap (spacing is 8)
-        final itemWidth = (constraints.maxWidth - 8) / 2;
-
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: options.map((option) {
-            final isSelected = selectedValue == option;
-
-            return GestureDetector(
-              onTap: () => onChanged(option),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                width: itemWidth,
-                height: 85,
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF1B5E20) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF1B5E20)
-                        : const Color(0xFF388E3C),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    // Content
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _getIconForOption(option),
-                              size: 26,
-                              color: isSelected
-                                  ? Colors.white
-                                  : const Color(0xFF388E3C),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              option,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isSelected
-                                    ? Colors.white
-                                    : const Color(0xFF1B5E20),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Check Badge
-                    if (isSelected)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF1B5E20),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            size: 10,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
     );
   }
 }
