@@ -18,10 +18,10 @@ class TreeInventoryTable extends StatelessWidget {
   }
 
   void _addRow() {
-    if (rows.length >= 25) return;
     final newRows = List<InventoryRow>.from(rows)..add(InventoryRow());
     onChanged(newRows);
   }
+
 
   void _removeRow(int index) {
     final newRows = List<InventoryRow>.from(rows)..removeAt(index);
@@ -128,15 +128,14 @@ class TreeInventoryTable extends StatelessWidget {
             }),
             const SizedBox(height: 8),
             // Add row button
-            if (rows.length < 25)
-              TextButton.icon(
-                onPressed: _addRow,
-                icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: Text('Add Row (${rows.length}/25)'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF1B5E20),
-                ),
+            TextButton.icon(
+              onPressed: _addRow,
+              icon: const Icon(Icons.add_circle_outline, size: 18),
+              label: const Text('Add Row'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1B5E20),
               ),
+            ),
           ],
         ),
       ),

@@ -92,6 +92,10 @@ class _FormScreenState extends State<FormScreen> {
     'Natural Recovery',
   ];
 
+  void _onCtrlChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
@@ -110,6 +114,9 @@ class _FormScreenState extends State<FormScreen> {
     _litterAvgDepthCtrl = TextEditingController(text: a?.forestLitterAvgDepth ?? '');
     _threatsCtrl = TextEditingController(text: a?.threats ?? '');
 
+    _gridNoCtrl.addListener(_onCtrlChanged);
+    _dateCtrl.addListener(_onCtrlChanged);
+
     _landCover = (a != null && a.landCover.isNotEmpty) ? a.landCover : null;
     _treeCrownCover = (a != null && a.treeCrownCover.isNotEmpty) ? a.treeCrownCover : null;
     _forestCondition = (a != null && a.forestCondition.isNotEmpty) ? a.forestCondition : null;
@@ -120,6 +127,8 @@ class _FormScreenState extends State<FormScreen> {
 
   @override
   void dispose() {
+    _gridNoCtrl.removeListener(_onCtrlChanged);
+    _dateCtrl.removeListener(_onCtrlChanged);
     _gridNoCtrl.dispose();
     _centroidNoCtrl.dispose();
     _elevationCtrl.dispose();
@@ -186,7 +195,17 @@ class _FormScreenState extends State<FormScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-
+    // Ensure all required radio selections are made
+    if (_landCover == null || _treeCrownCover == null || _forestCondition == null || _restorationApproach == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please fill all required fields'),
+          backgroundColor: const Color(0xFF1B5E20),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     setState(() => _saving = true);
 
     final assessment = Assessment(
@@ -232,37 +251,59 @@ class _FormScreenState extends State<FormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final gridNo = _gridNoCtrl.text.trim();
+    final date = _dateCtrl.text.trim();
+    final breadcrumbText = "DENR Field Survey  ›  Grid ${gridNo.isEmpty ? '—' : gridNo}  ›  ${date.isEmpty ? '—' : date}";
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _isEditing ? 'Edit Assessment' : 'New Assessment',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white),
         ),
-        centerTitle: true,
+        centerTitle: false,
         backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
+          const Icon(Icons.cloud_off, color: Colors.white70),
+          const SizedBox(width: 4),
           if (_saving)
             const Padding(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               ),
             )
           else
             IconButton(
               onPressed: _save,
-              icon: const Icon(Icons.check_circle),
+              icon: const Icon(Icons.check_circle_outline),
               tooltip: 'Save',
             ),
         ],
       ),
       backgroundColor: const Color(0xFFF1F8E9),
-      body: Form(
-        key: _formKey,
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            color: const Color(0xFF1B5E20),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: Text(
+              breadcrumbText,
+              style: const TextStyle(
+                color: Color(0xFFA5D6A7),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Form(
+              key: _formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           children: [
@@ -274,17 +315,19 @@ class _FormScreenState extends State<FormScreen> {
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _gridNoCtrl,
-                    decoration: _inputDecoration('Grid No.', icon: Icons.grid_on),
-                    style: const TextStyle(fontSize: 14),
+                      controller: _gridNoCtrl,
+                      decoration: _inputDecoration('Grid No.', icon: Icons.grid_on),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
-                    controller: _centroidNoCtrl,
-                    decoration: _inputDecoration('Centroid No.', icon: Icons.adjust),
-                    style: const TextStyle(fontSize: 14),
+                      controller: _centroidNoCtrl,
+                      decoration: _inputDecoration('Centroid No.', icon: Icons.adjust),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      style: const TextStyle(fontSize: 14),
                   ),
                 ),
               ],
@@ -295,47 +338,53 @@ class _FormScreenState extends State<FormScreen> {
               children: [
                 Expanded(
                   child: TextFormField(
-                    controller: _elevationCtrl,
-                    decoration: _inputDecoration('Elevation', icon: Icons.terrain),
-                    style: const TextStyle(fontSize: 14),
+                      controller: _elevationCtrl,
+                      decoration: _inputDecoration('Elevation', icon: Icons.terrain),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      style: const TextStyle(fontSize: 14),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
-                    controller: _dateCtrl,
-                    readOnly: true,
-                    onTap: _pickDate,
-                    decoration: _inputDecoration('Date', icon: Icons.calendar_today),
-                    style: const TextStyle(fontSize: 14),
+                      controller: _dateCtrl,
+                      readOnly: true,
+                      onTap: _pickDate,
+                      decoration: _inputDecoration('Date', icon: Icons.calendar_today),
+                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      style: const TextStyle(fontSize: 14),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: _locationCtrl,
-              decoration: _inputDecoration('Location', icon: Icons.location_on),
-              style: const TextStyle(fontSize: 14),
+               controller: _locationCtrl,
+               decoration: _inputDecoration('Location', icon: Icons.location_on),
+               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: _coordsTargetCtrl,
-              decoration: _inputDecoration('Coordinates (Target)', icon: Icons.my_location),
-              style: const TextStyle(fontSize: 14),
+                controller: _coordsTargetCtrl,
+                decoration: _inputDecoration('Coordinates (Target)', icon: Icons.my_location),
+                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: _coordsActualCtrl,
-              decoration: _inputDecoration('Coordinates (Actual)', icon: Icons.gps_fixed),
-              style: const TextStyle(fontSize: 14),
+                controller: _coordsActualCtrl,
+                decoration: _inputDecoration('Coordinates (Actual)', icon: Icons.gps_fixed),
+                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: _teamMembersCtrl,
-              decoration: _inputDecoration('Team Members', icon: Icons.group),
-              maxLines: 2,
-              style: const TextStyle(fontSize: 14),
+                controller: _teamMembersCtrl,
+                decoration: _inputDecoration('Team Members', icon: Icons.group),
+                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 14),
             ),
 
             // ── SECTION B: Land Cover (Radio) ──
@@ -369,10 +418,11 @@ class _FormScreenState extends State<FormScreen> {
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: _forestConditionNotesCtrl,
-              decoration: _inputDecoration('Additional Notes / Description', icon: Icons.edit_note),
-              maxLines: 3,
-              style: const TextStyle(fontSize: 14),
+               controller: _forestConditionNotesCtrl,
+               decoration: _inputDecoration('Additional Notes / Description', icon: Icons.edit_note),
+               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+               maxLines: 3,
+               style: const TextStyle(fontSize: 14),
             ),
 
             // ── SECTION E: Forest Litter (Fillable) ──
@@ -388,19 +438,21 @@ class _FormScreenState extends State<FormScreen> {
                   children: [
                     Expanded(
                       child: TextFormField(
-                        controller: _litterGroundCoverCtrl,
-                        decoration: _inputDecoration('Ground Cover %', icon: Icons.percent),
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 14),
+                          controller: _litterGroundCoverCtrl,
+                          decoration: _inputDecoration('Ground Cover %', icon: Icons.percent),
+                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 14),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextFormField(
-                        controller: _litterAvgDepthCtrl,
-                        decoration: _inputDecoration('Avg Depth (cm)', icon: Icons.straighten),
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 14),
+                          controller: _litterAvgDepthCtrl,
+                          decoration: _inputDecoration('Avg Depth (cm)', icon: Icons.straighten),
+                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 14),
                       ),
                     ),
                   ],
@@ -412,10 +464,11 @@ class _FormScreenState extends State<FormScreen> {
             const SectionHeader(title: 'Threats', icon: Icons.warning_amber),
             const SizedBox(height: 8),
             TextFormField(
-              controller: _threatsCtrl,
-              decoration: _inputDecoration('Describe any threats observed', icon: Icons.report_problem),
-              maxLines: 3,
-              style: const TextStyle(fontSize: 14),
+               controller: _threatsCtrl,
+               decoration: _inputDecoration('Describe any threats observed', icon: Icons.report_problem),
+               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+               maxLines: 3,
+               style: const TextStyle(fontSize: 14),
             ),
 
             // ── SECTION G: Inventory ──
@@ -455,6 +508,9 @@ class _FormScreenState extends State<FormScreen> {
           ],
         ),
       ),
+    ),
+  ],
+),
       // Save button at bottom
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
