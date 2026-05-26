@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
 import '../widgets/section_header.dart';
@@ -29,11 +30,8 @@ class _FormScreenState extends State<FormScreen> {
   late TextEditingController _coordsActualCtrl;
   late TextEditingController _teamMembersCtrl;
 
-  // Radio selections
-  String? _landCover;
-  String? _treeCrownCover;
-  String? _forestCondition;
-  String? _restorationApproach;
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
 
   // Forest condition notes controller
   late TextEditingController _forestConditionNotesCtrl;
@@ -49,6 +47,10 @@ class _FormScreenState extends State<FormScreen> {
   List<InventoryRow> _inventoryRows = [];
 
   bool get _isEditing => widget.assessment != null;
+  String? _landCover;
+  String? _treeCrownCover;
+  String? _forestCondition;
+  String? _restorationApproach;
 
   // Land cover options
   static const _landCoverOptions = [
@@ -75,11 +77,11 @@ class _FormScreenState extends State<FormScreen> {
   // Forest condition options
   static const _forestConditionOptions = [
     'Old Growth Forest',
+    'Residual Forest',
     'Industrial Forest Plantation',
-    'Advance Secondary Growth Forest',
-    'Open, Uncultivated Area',
-    'Early Secondary Growth Forest',
-    'Open, Cultivated Area',
+    'Community-Based Forest',
+    'Agroforestry',
+    'Degraded Forest',
   ];
 
   // Restoration options
@@ -109,6 +111,8 @@ class _FormScreenState extends State<FormScreen> {
     _coordsTargetCtrl = TextEditingController(text: a?.coordsTarget ?? '');
     _coordsActualCtrl = TextEditingController(text: a?.coordsActual ?? '');
     _teamMembersCtrl = TextEditingController(text: a?.teamMembers ?? '');
+    _speech = stt.SpeechToText();
+    _isListening = false;
     _forestConditionNotesCtrl = TextEditingController(
       text: a?.forestConditionNotes ?? '',
     );
@@ -187,6 +191,25 @@ class _FormScreenState extends State<FormScreen> {
         borderSide: const BorderSide(color: Color(0xFF1B5E20), width: 1.5),
       ),
     );
+  }
+
+  Future<void> _listenForestConditionNotes() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize();
+      if (available) {
+        _speech.listen(onResult: (val) {
+          setState(() {
+            _forestConditionNotesCtrl.text +=
+                ( _forestConditionNotesCtrl.text.isEmpty ? '' : ' ' ) +
+                val.recognizedWords;
+          });
+        });
+        setState(() => _isListening = true);
+      }
+    } else {
+      await _speech.stop();
+      setState(() => _isListening = false);
+    }
   }
 
   Future<void> _pickDate() async {
@@ -564,23 +587,10 @@ class _FormScreenState extends State<FormScreen> {
                     icon: Icons.forest,
                   ),
                   const SizedBox(height: 8),
-                  CustomRadioGroup(
+                  _RadioGridWidget(
                     selectedValue: _forestCondition,
                     options: _forestConditionOptions,
-                    crossAxisCount: 2,
                     onChanged: (v) => setState(() => _forestCondition = v),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _forestConditionNotesCtrl,
-                    decoration: _inputDecoration(
-                      'Additional Notes / Description',
-                      icon: Icons.edit_note,
-                    ),
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Required' : null,
-                    maxLines: 3,
-                    style: const TextStyle(fontSize: 14),
                   ),
 
                   // ── SECTION E: Forest Litter (Fillable) ──
@@ -766,6 +776,19 @@ class _RadioGridWidget extends StatelessWidget {
 
   IconData _getIconForOption(String option) {
     switch (option) {
+      case 'Old Growth Forest':
+        return Icons.park;
+      case 'Industrial Forest Plantation':
+        return Icons.precision_manufacturing;
+      case 'Community-Based Forest':
+        return Icons.people;
+      case 'Agroforestry':
+        return Icons.spa;
+      case 'Degraded Forest':
+        return Icons.warning_amber;
+      case 'Residual Forest':
+        return Icons.nature;
+      // Existing mappings fall through
       case 'Open Forest':
         return Icons.forest;
       case 'Annual Crop':
