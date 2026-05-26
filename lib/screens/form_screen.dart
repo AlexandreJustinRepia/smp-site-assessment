@@ -498,20 +498,23 @@ class _FormScreenState extends State<FormScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: Row(
-                      children: List.generate(3, (index) {
+                      children: List.generate(_treeCrownCoverOptions.length, (index) {
                         final option = _treeCrownCoverOptions[index];
                         final isSelected = _treeCrownCover == option;
-                        final List<Color> unselectedColors = [
-                          const Color(0xFFFFCDD2),
-                          const Color(0xFFFFE0B2),
-                          const Color(0xFFC8E6C9),
+                        // Color palettes matching the three segments; use modulo to avoid out-of-range if list length varies
+                        final List<Color> unselectedColors = const [
+                          Color(0xFFFFCDD2),
+                          Color(0xFFFFE0B2),
+                          Color(0xFFC8E6C9),
                         ];
-                        final List<Color> selectedColors = [
-                          const Color(0xFFC62828),
-                          const Color(0xFFE65100),
-                          const Color(0xFF2E7D32),
+                        final List<Color> selectedColors = const [
+                          Color(0xFFC62828),
+                          Color(0xFFE65100),
+                          Color(0xFF2E7D32),
                         ];
-                        final bgColor = isSelected ? selectedColors[index] : unselectedColors[index];
+                        final bgColor = isSelected
+                            ? selectedColors[index % selectedColors.length]
+                            : unselectedColors[index % unselectedColors.length];
                         return Expanded(
                           child: GestureDetector(
                             onTap: () => setState(() => _treeCrownCover = option),
@@ -519,18 +522,25 @@ class _FormScreenState extends State<FormScreen> {
                               height: 56,
                               color: bgColor,
                               alignment: Alignment.center,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isSelected)
-                                    const Icon(Icons.check, color: Colors.white, size: 16),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    option,
-                                    style: const TextStyle(color: Colors.white),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isSelected)
+                                      const Icon(Icons.check, color: Colors.white, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      option,
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : Colors.black87,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
