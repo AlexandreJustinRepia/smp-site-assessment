@@ -16,12 +16,44 @@ class _ListScreenState extends State<ListScreen> {
   List<Assessment> _assessments = [];
   bool _loading = true;
   bool _backupBusy = false;
+  final _searchCtrl = TextEditingController();
   final _backupService = BackupService();
+
+  List<Assessment> get _filteredAssessments {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    if (query.isEmpty) return _assessments;
+
+    return _assessments.where((assessment) {
+      final searchableText = [
+        assessment.gridNo,
+        assessment.centroidNo,
+        assessment.date,
+        assessment.location,
+        assessment.coordsTarget,
+        assessment.coordsActual,
+        assessment.teamMembers,
+        assessment.landCover,
+        assessment.treeCrownCover,
+        assessment.forestCondition,
+        assessment.threats,
+        assessment.restorationApproach,
+      ].join(' ').toLowerCase();
+
+      return searchableText.contains(query);
+    }).toList();
+  }
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() => setState(() {}));
     _loadAssessments();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAssessments() async {
@@ -35,8 +67,11 @@ class _ListScreenState extends State<ListScreen> {
     });
   }
 
-  Future<void> _deleteAssessment(int id, int index) async {
-    final deleted = _assessments[index];
+  Future<void> _deleteAssessment(Assessment assessment) async {
+    final deleted = assessment;
+    final id = assessment.id;
+    if (id == null) return;
+
     await DatabaseHelper.instance.delete(id);
     if (!mounted) return;
     await _loadAssessments();
@@ -139,6 +174,9 @@ class _ListScreenState extends State<ListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredAssessments = _filteredAssessments;
+    final isSearching = _searchCtrl.text.trim().isNotEmpty;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -294,7 +332,9 @@ class _ListScreenState extends State<ListScreen> {
                   const Icon(Icons.assessment, color: Color(0xFF1B5E20), size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    '${_assessments.length} Record${_assessments.length != 1 ? 's' : ''}',
+                    isSearching
+                        ? '${filteredAssessments.length} of ${_assessments.length} Records'
+                        : '${_assessments.length} Record${_assessments.length != 1 ? 's' : ''}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -325,6 +365,47 @@ class _ListScreenState extends State<ListScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search assessments',
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF1B5E20)),
+                  suffixIcon: isSearching
+                      ? IconButton(
+                          onPressed: _searchCtrl.clear,
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Clear search',
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF1B5E20),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -360,11 +441,51 @@ class _ListScreenState extends State<ListScreen> {
                 ),
               ),
             )
+          else if (filteredAssessments.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.search_off,
+                        size: 72,
+                        color: const Color(0xFF1B5E20).withValues(alpha: 0.22),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No matching assessments',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Try another grid, location, date, team member, or land cover.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
-                  final a = _assessments[index];
+                  final a = filteredAssessments[index];
+                  final locationLine = [
+                    if (a.location.isNotEmpty) a.location,
+                    if (a.centroidNo.isNotEmpty) 'Centroid ${a.centroidNo}',
+                  ].join(' • ');
+
                   return Dismissible(
                     key: Key('assessment_${a.id}'),
                     direction: DismissDirection.endToStart,
@@ -399,7 +520,7 @@ class _ListScreenState extends State<ListScreen> {
                         ),
                       );
                     },
-                    onDismissed: (_) => _deleteAssessment(a.id!, index),
+                    onDismissed: (_) => _deleteAssessment(a),
                     child: GestureDetector(
                       onTap: () async {
                         await Navigator.push(
@@ -410,10 +531,10 @@ class _ListScreenState extends State<ListScreen> {
                         _loadAssessments();
                       },
                       child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border(
                             left: BorderSide(
                               color: const Color(0xFF1B5E20).withValues(alpha: 0.7),
@@ -429,15 +550,24 @@ class _ListScreenState extends State<ListScreen> {
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    _getLandCoverIcon(a.landCover),
-                                    style: const TextStyle(fontSize: 22),
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F8E9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      _getLandCoverIcon(a.landCover),
+                                      style: const TextStyle(fontSize: 20),
+                                    ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
@@ -452,16 +582,18 @@ class _ListScreenState extends State<ListScreen> {
                                             color: Color(0xFF1B5E20),
                                           ),
                                         ),
-                                        if (a.location.isNotEmpty)
-                                          Text(
-                                            a.location,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey.shade600,
-                                            ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          locationLine.isNotEmpty
+                                              ? locationLine
+                                              : 'No location details',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
                                           ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -482,22 +614,45 @@ class _ListScreenState extends State<ListScreen> {
                                   ),
                                 ],
                               ),
-                              if (a.landCover.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF9A825).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    a.landCover,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF33691E),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  if (a.landCover.isNotEmpty)
+                                    _AssessmentTag(label: a.landCover),
+                                  if (a.forestCondition.isNotEmpty)
+                                    _AssessmentTag(label: a.forestCondition),
+                                  if (a.inventoryRows.isNotEmpty)
+                                    _AssessmentTag(
+                                      label:
+                                          '${a.inventoryRows.length} inventory row${a.inventoryRows.length == 1 ? '' : 's'}',
+                                      icon: Icons.table_rows,
                                     ),
-                                  ),
+                                ],
+                              ),
+                              if (a.teamMembers.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.group,
+                                      size: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        a.teamMembers,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ],
@@ -507,7 +662,7 @@ class _ListScreenState extends State<ListScreen> {
                     ),
                   );
                 },
-                childCount: _assessments.length,
+                childCount: filteredAssessments.length,
               ),
             ),
           // Bottom padding
@@ -528,6 +683,44 @@ class _ListScreenState extends State<ListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New Assessment'),
         elevation: 4,
+      ),
+    );
+  }
+}
+
+class _AssessmentTag extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+
+  const _AssessmentTag({
+    required this.label,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9A825).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: const Color(0xFF33691E)),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF33691E),
+            ),
+          ),
+        ],
       ),
     );
   }
