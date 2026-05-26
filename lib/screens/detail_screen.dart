@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -206,43 +207,246 @@ class _DetailScreenState extends State<DetailScreen> {
     final pdf = pw.Document();
     final a = _assessment;
     final inventory = a.inventoryRows;
+
     try {
+      final logoBytes = await rootBundle.load('assets/images/logo/logo.png');
+      final logo = pw.MemoryImage(logoBytes.buffer.asUint8List());
+      const green = PdfColor.fromInt(0xFF1B5E20);
+      const lightGreen = PdfColor.fromInt(0xFFE8F5E9);
+      const gold = PdfColor.fromInt(0xFFF9A825);
+      const muted = PdfColor.fromInt(0xFF607D66);
+      const border = PdfColor.fromInt(0xFFD8E6D9);
+
+      String valueOrDash(String value) => value.isNotEmpty ? value : '-';
+
+      pw.Widget sectionTitle(String title) {
+        return pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 8),
+          child: pw.Row(
+            children: [
+              pw.Container(width: 4, height: 14, color: gold),
+              pw.SizedBox(width: 7),
+              pw.Text(
+                title,
+                style: pw.TextStyle(
+                  color: green,
+                  fontSize: 12,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      pw.Widget fieldTile(String label, String value) {
+        return pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.white,
+            border: pw.Border.all(color: border, width: 0.7),
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                label.toUpperCase(),
+                style: pw.TextStyle(
+                  color: muted,
+                  fontSize: 6.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 3),
+              pw.Text(
+                valueOrDash(value),
+                maxLines: 2,
+                style: pw.TextStyle(
+                  color: PdfColors.black,
+                  fontSize: 9,
+                  fontWeight: pw.FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      pw.Widget infoGrid(List<List<String>> items) {
+        return pw.Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: items
+              .map(
+                (item) => pw.SizedBox(
+                  width: 156,
+                  child: fieldTile(item[0], item[1]),
+                ),
+              )
+              .toList(),
+        );
+      }
+
+      pw.Widget badge(String label, String value) {
+        return pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: pw.BoxDecoration(
+            color: lightGreen,
+            borderRadius: pw.BorderRadius.circular(8),
+            border: pw.Border.all(color: border, width: 0.8),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                label.toUpperCase(),
+                style: pw.TextStyle(
+                  color: muted,
+                  fontSize: 6.5,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                valueOrDash(value),
+                style: pw.TextStyle(
+                  color: green,
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      pw.Widget noteBox(String title, String value) {
+        return pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            color: const PdfColor.fromInt(0xFFFFF8E1),
+            borderRadius: pw.BorderRadius.circular(8),
+            border: pw.Border.all(color: const PdfColor.fromInt(0xFFFFECB3)),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                title.toUpperCase(),
+                style: pw.TextStyle(
+                  color: const PdfColor.fromInt(0xFF8A6D00),
+                  fontSize: 7,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(valueOrDash(value), style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ),
+        );
+      }
+
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(32),
-          build: (pw.Context context) => [
-          // Header
-          pw.Row(
+          margin: const pw.EdgeInsets.fromLTRB(30, 26, 30, 30),
+          footer: (context) => pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text(
                 'SMP Site Assessment',
-                style: pw.TextStyle(
-                  fontSize: 24,
-                  fontWeight: pw.FontWeight.bold,
-                ),
+                style: pw.TextStyle(fontSize: 7, color: muted),
               ),
               pw.Text(
-                'Date: ${a.date}',
-                style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600),
+                'Page ${context.pageNumber} of ${context.pagesCount}',
+                style: pw.TextStyle(fontSize: 7, color: muted),
               ),
             ],
           ),
-          pw.SizedBox(height: 12),
-          // Survey Info
-          pw.Text(
-            'Survey Information',
-            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.TableHelper.fromTextArray(
-            cellAlignment: pw.Alignment.centerLeft,
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              fontSize: 12,
+          build: (pw.Context context) => [
+            pw.Container(
+              padding: const pw.EdgeInsets.all(14),
+              decoration: pw.BoxDecoration(
+                color: green,
+                borderRadius: pw.BorderRadius.circular(10),
+              ),
+              child: pw.Row(
+                children: [
+                  pw.Container(
+                    width: 46,
+                    height: 46,
+                    padding: const pw.EdgeInsets.all(5),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.white,
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Image(logo, fit: pw.BoxFit.contain),
+                  ),
+                  pw.SizedBox(width: 12),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'SMP Site Assessment',
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 20,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          'Site Monitoring Platform field assessment report',
+                          style: const pw.TextStyle(
+                            color: PdfColor.fromInt(0xFFA5D6A7),
+                            fontSize: 9,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.white,
+                      borderRadius: pw.BorderRadius.circular(7),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'ASSESSMENT DATE',
+                          style: pw.TextStyle(
+                            color: muted,
+                            fontSize: 6,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          valueOrDash(a.date),
+                          style: pw.TextStyle(
+                            color: green,
+                            fontSize: 9,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            data: [
+            pw.SizedBox(height: 16),
+
+            sectionTitle('Survey Information'),
+            infoGrid([
               ['Grid No.', a.gridNo],
               ['Centroid No.', a.centroidNo],
               ['Elevation', a.elevation],
@@ -250,97 +454,123 @@ class _DetailScreenState extends State<DetailScreen> {
               ['Target Coordinates', a.coordsTarget],
               ['Actual Coordinates', a.coordsActual],
               ['Team Members', a.teamMembers],
+            ]),
+            pw.SizedBox(height: 14),
+
+            sectionTitle('Site Classification'),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: badge('Land Cover / Existing Land-Use', a.landCover),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Expanded(child: badge('Tree Crown Cover', a.treeCrownCover)),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: badge('Forest Condition', a.forestCondition),
+                ),
+              ],
+            ),
+            if (a.forestConditionNotes.isNotEmpty) ...[
+              pw.SizedBox(height: 8),
+              noteBox('Forest Condition Notes', a.forestConditionNotes),
             ],
-          ),
-          pw.SizedBox(height: 12),
-          // Land Cover
-          pw.Text(
-            'Land Cover / Existing Land-Use: ${a.landCover}',
-            style: pw.TextStyle(fontSize: 14),
-          ),
-          pw.SizedBox(height: 6),
-          // Tree Crown Cover
-          pw.Text(
-            'Tree Crown Cover: ${a.treeCrownCover}',
-            style: pw.TextStyle(fontSize: 14),
-          ),
-          pw.SizedBox(height: 6),
-          // Forest Condition
-          pw.Text(
-            'Forest Condition: ${a.forestCondition}',
-            style: pw.TextStyle(fontSize: 14),
-          ),
-          if (a.forestConditionNotes.isNotEmpty)
-            pw.Text(
-              'Notes: ${a.forestConditionNotes}',
-              style: pw.TextStyle(fontSize: 14),
-            ),
-          pw.SizedBox(height: 6),
-          // Forest Litter
-          pw.Text(
-            'Forest Litter',
-            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.TableHelper.fromTextArray(
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              fontSize: 12,
-            ),
-            data: [
+            pw.SizedBox(height: 14),
+
+            sectionTitle('Forest Litter'),
+            infoGrid([
               ['Ground Cover %', a.forestLitterGroundCover],
-              ['Avg Depth (cm)', a.forestLitterAvgDepth],
-            ],
-          ),
-          pw.SizedBox(height: 6),
-          // Threats
-          pw.Text(
-            'Threats',
-            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.Text(a.threats, style: pw.TextStyle(fontSize: 14)),
-          pw.SizedBox(height: 6),
-          // Inventory Table
-          pw.Text(
-            'Inventory of Regenerants & Trees',
-            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.TableHelper.fromTextArray(
-            cellAlignment: pw.Alignment.centerLeft,
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              fontSize: 12,
+              ['Average Depth (cm)', a.forestLitterAvgDepth],
+            ]),
+            pw.SizedBox(height: 12),
+
+            noteBox('Threats', a.threats),
+            pw.SizedBox(height: 14),
+
+            sectionTitle('Inventory of Regenerants & Trees'),
+            pw.TableHelper.fromTextArray(
+              border: pw.TableBorder.all(color: border, width: 0.6),
+              cellAlignment: pw.Alignment.centerLeft,
+              headerDecoration: pw.BoxDecoration(color: lightGreen),
+              headerStyle: pw.TextStyle(
+                color: green,
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+              ),
+              cellStyle: const pw.TextStyle(fontSize: 8),
+              cellPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 5,
+              ),
+              headers: ['No.', 'Species', 'DBH', 'MH', 'TH', 'Remarks'],
+              data: inventory.isEmpty
+                  ? [
+                      ['-', 'No inventory entries', '-', '-', '-', '-'],
+                    ]
+                  : inventory
+                        .asMap()
+                        .entries
+                        .map(
+                          (e) => [
+                            '${e.key + 1}',
+                            valueOrDash(e.value.species),
+                            valueOrDash(e.value.dbh),
+                            valueOrDash(e.value.mh),
+                            valueOrDash(e.value.th),
+                            valueOrDash(e.value.remarks),
+                          ],
+                        )
+                        .toList(),
+              columnWidths: {
+                0: const pw.FixedColumnWidth(28),
+                1: const pw.FlexColumnWidth(2.6),
+                2: const pw.FixedColumnWidth(42),
+                3: const pw.FixedColumnWidth(34),
+                4: const pw.FixedColumnWidth(34),
+                5: const pw.FlexColumnWidth(2.2),
+              },
             ),
-            data: inventory.isEmpty
-                ? []
-                : inventory
-                      .asMap()
-                      .entries
-                      .map(
-                        (e) => [
-                          '${e.key + 1}',
-                          e.value.species,
-                          e.value.dbh,
-                          e.value.mh,
-                          e.value.th,
-                          e.value.remarks,
-                        ],
-                      )
-                      .toList(),
-            columnWidths: {
-              0: const pw.FixedColumnWidth(30),
-              1: const pw.FlexColumnWidth(),
-              2: const pw.FixedColumnWidth(40),
-              3: const pw.FixedColumnWidth(30),
-              4: const pw.FixedColumnWidth(30),
-              5: const pw.FlexColumnWidth(),
-            },
-          ),
-          pw.SizedBox(height: 6),
-          // Restoration
-          pw.Text(
-            'Recommended Restoration Approaches: ${a.restorationApproach}',
-            style: pw.TextStyle(fontSize: 14),
-          ),
+            pw.SizedBox(height: 14),
+
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: green,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Container(width: 6, height: 26, color: gold),
+                  pw.SizedBox(width: 8),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'RECOMMENDED RESTORATION APPROACH',
+                          style: const pw.TextStyle(
+                            color: PdfColor.fromInt(0xFFA5D6A7),
+                            fontSize: 7,
+                          ),
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          valueOrDash(a.restorationApproach),
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       );
