@@ -109,18 +109,30 @@ class _FormScreenState extends State<FormScreen> {
     _coordsTargetCtrl = TextEditingController(text: a?.coordsTarget ?? '');
     _coordsActualCtrl = TextEditingController(text: a?.coordsActual ?? '');
     _teamMembersCtrl = TextEditingController(text: a?.teamMembers ?? '');
-    _forestConditionNotesCtrl = TextEditingController(text: a?.forestConditionNotes ?? '');
-    _litterGroundCoverCtrl = TextEditingController(text: a?.forestLitterGroundCover ?? '');
-    _litterAvgDepthCtrl = TextEditingController(text: a?.forestLitterAvgDepth ?? '');
+    _forestConditionNotesCtrl = TextEditingController(
+      text: a?.forestConditionNotes ?? '',
+    );
+    _litterGroundCoverCtrl = TextEditingController(
+      text: a?.forestLitterGroundCover ?? '',
+    );
+    _litterAvgDepthCtrl = TextEditingController(
+      text: a?.forestLitterAvgDepth ?? '',
+    );
     _threatsCtrl = TextEditingController(text: a?.threats ?? '');
 
     _gridNoCtrl.addListener(_onCtrlChanged);
     _dateCtrl.addListener(_onCtrlChanged);
 
     _landCover = (a != null && a.landCover.isNotEmpty) ? a.landCover : null;
-    _treeCrownCover = (a != null && a.treeCrownCover.isNotEmpty) ? a.treeCrownCover : null;
-    _forestCondition = (a != null && a.forestCondition.isNotEmpty) ? a.forestCondition : null;
-    _restorationApproach = (a != null && a.restorationApproach.isNotEmpty) ? a.restorationApproach : null;
+    _treeCrownCover = (a != null && a.treeCrownCover.isNotEmpty)
+        ? a.treeCrownCover
+        : null;
+    _forestCondition = (a != null && a.forestCondition.isNotEmpty)
+        ? a.forestCondition
+        : null;
+    _restorationApproach = (a != null && a.restorationApproach.isNotEmpty)
+        ? a.restorationApproach
+        : null;
 
     _inventoryRows = a?.inventoryRows ?? [InventoryRow()];
   }
@@ -144,13 +156,18 @@ class _FormScreenState extends State<FormScreen> {
     super.dispose();
   }
 
-
-
-  InputDecoration _inputDecoration(String label, {IconData? icon, Widget? suffix, String? hintText}) {
+  InputDecoration _inputDecoration(
+    String label, {
+    IconData? icon,
+    Widget? suffix,
+    String? hintText,
+  }) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF558B2F)),
-      prefixIcon: icon != null ? Icon(icon, size: 20, color: const Color(0xFF1B5E20)) : null,
+      prefixIcon: icon != null
+          ? Icon(icon, size: 20, color: const Color(0xFF1B5E20))
+          : null,
       suffixIcon: suffix,
       hintText: hintText,
       hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
@@ -201,7 +218,10 @@ class _FormScreenState extends State<FormScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     // Ensure all required radio selections are made
-    if (_landCover == null || _treeCrownCover == null || _forestCondition == null || _restorationApproach == null) {
+    if (_landCover == null ||
+        _treeCrownCover == null ||
+        _forestCondition == null ||
+        _restorationApproach == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please fill all required fields'),
@@ -258,13 +278,18 @@ class _FormScreenState extends State<FormScreen> {
   Widget build(BuildContext context) {
     final gridNo = _gridNoCtrl.text.trim();
     final date = _dateCtrl.text.trim();
-    final breadcrumbText = "DENR Field Survey  ›  Grid ${gridNo.isEmpty ? '—' : gridNo}  ›  ${date.isEmpty ? '—' : date}";
+    final breadcrumbText =
+        "DENR Field Survey  ›  Grid ${gridNo.isEmpty ? '—' : gridNo}  ›  ${date.isEmpty ? '—' : date}";
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _isEditing ? 'Edit Assessment' : 'New Assessment',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: Colors.white),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 17,
+            color: Colors.white,
+          ),
         ),
         centerTitle: false,
         backgroundColor: const Color(0xFF1B5E20),
@@ -279,7 +304,10 @@ class _FormScreenState extends State<FormScreen> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               ),
             )
           else
@@ -309,238 +337,362 @@ class _FormScreenState extends State<FormScreen> {
           Expanded(
             child: Form(
               key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
-          children: [
-            // ── SECTION A: Header Information ──
-            const SectionHeader(title: 'Survey Information', icon: Icons.info_outline),
-            const SizedBox(height: 8),
-
-
-
-            // Row: Grid No, Centroid No
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                      controller: _gridNoCtrl,
-                      decoration: _inputDecoration('Grid No.', icon: Icons.grid_on),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      style: const TextStyle(fontSize: 14),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 120),
+                children: [
+                  // ── SECTION A: Header Information ──
+                  const SectionHeader(
+                    title: 'Survey Information',
+                    icon: Icons.info_outline,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                      controller: _centroidNoCtrl,
-                      decoration: _inputDecoration('Centroid No.', icon: Icons.adjust),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Row: Elevation, Date
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                      controller: _elevationCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: _inputDecoration('Elevation', icon: Icons.terrain),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                      style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FormField<String>(
-                    initialValue: _dateCtrl.text,
-                    validator: (value) => _dateCtrl.text.isEmpty ? 'Required' : null,
-                    builder: (FormFieldState<String> state) {
-                      return InkWell(
-                        onTap: () async {
-                          await _pickDate();
-                          state.didChange(_dateCtrl.text);
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: InputDecorator(
-                          decoration: _inputDecoration('Date', icon: Icons.calendar_today).copyWith(
-                            errorText: state.errorText,
+                  const SizedBox(height: 8),
+
+                  // Row: Grid No, Centroid No
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _gridNoCtrl,
+                          decoration: _inputDecoration(
+                            'Grid No.',
+                            icon: Icons.grid_on,
                           ),
-                          child: Text(
-                            _dateCtrl.text.isEmpty ? 'Select Date' : _dateCtrl.text,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: _dateCtrl.text.isEmpty ? Colors.grey.shade600 : Colors.black87,
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'Required'
+                              : null,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _centroidNoCtrl,
+                          decoration: _inputDecoration(
+                            'Centroid No.',
+                            icon: Icons.adjust,
+                          ),
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'Required'
+                              : null,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Row: Elevation, Date
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _elevationCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: _inputDecoration(
+                            'Elevation',
+                            icon: Icons.terrain,
+                          ),
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'Required'
+                              : null,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FormField<String>(
+                          initialValue: _dateCtrl.text,
+                          validator: (value) =>
+                              _dateCtrl.text.isEmpty ? 'Required' : null,
+                          builder: (FormFieldState<String> state) {
+                            return InkWell(
+                              onTap: () async {
+                                await _pickDate();
+                                state.didChange(_dateCtrl.text);
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: InputDecorator(
+                                decoration: _inputDecoration(
+                                  'Date',
+                                  icon: Icons.calendar_today,
+                                ).copyWith(errorText: state.errorText),
+                                child: Text(
+                                  _dateCtrl.text.isEmpty
+                                      ? 'Select Date'
+                                      : _dateCtrl.text,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _dateCtrl.text.isEmpty
+                                        ? Colors.grey.shade600
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _locationCtrl,
+                    decoration: _inputDecoration('Location', icon: Icons.place),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Required' : null,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _coordsTargetCtrl,
+                    decoration: _inputDecoration(
+                      'Coordinates (Target)',
+                      icon: Icons.my_location,
+                    ),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Required' : null,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _coordsActualCtrl,
+                    decoration: _inputDecoration(
+                      'Coordinates (Actual)',
+                      icon: Icons.gps_fixed,
+                    ),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Required' : null,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _teamMembersCtrl,
+                    decoration: _inputDecoration(
+                      'Team Members',
+                      icon: Icons.group,
+                      hintText: 'Enter names separated by comma',
+                    ),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Required' : null,
+                    maxLines: 2,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+
+                  // ── SECTION B: Land Cover (Radio) ──
+                  const SectionHeader(
+                    title: 'Land Cover / Existing Land-Use',
+                    icon: Icons.landscape,
+                  ),
+                  const SizedBox(height: 8),
+                  _RadioGridWidget(
+                    selectedValue: _landCover,
+                    options: _landCoverOptions,
+                    onChanged: (v) => setState(() => _landCover = v),
+                  ),
+
+                  // ── SECTION C: Tree Crown Cover (Radio) ──
+                  const SectionHeader(
+                    title: 'Tree Crown Cover',
+                    icon: Icons.park,
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Row(
+                      children: List.generate(3, (index) {
+                        final option = _treeCrownCoverOptions[index];
+                        final isSelected = _treeCrownCover == option;
+                        final List<Color> unselectedColors = [
+                          const Color(0xFFFFCDD2),
+                          const Color(0xFFFFE0B2),
+                          const Color(0xFFC8E6C9),
+                        ];
+                        final List<Color> selectedColors = [
+                          const Color(0xFFC62828),
+                          const Color(0xFFE65100),
+                          const Color(0xFF2E7D32),
+                        ];
+                        final bgColor = isSelected ? selectedColors[index] : unselectedColors[index];
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _treeCrownCover = option),
+                            child: Container(
+                              height: 56,
+                              color: bgColor,
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSelected)
+                                    const Icon(Icons.check, color: Colors.white, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    option,
+                                    style: const TextStyle(color: Colors.white),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      }),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-               controller: _locationCtrl,
-               decoration: _inputDecoration('Location', icon: Icons.place),
-               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-               style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: _coordsTargetCtrl,
-                decoration: _inputDecoration('Coordinates (Target)', icon: Icons.my_location),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: _coordsActualCtrl,
-                decoration: _inputDecoration('Coordinates (Actual)', icon: Icons.gps_fixed),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: _teamMembersCtrl,
-                decoration: _inputDecoration(
-                  'Team Members',
-                  icon: Icons.group,
-                  hintText: 'Enter names separated by comma',
-                ),
-                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 14),
-            ),
-
-            // ── SECTION B: Land Cover (Radio) ──
-            const SectionHeader(title: 'Land Cover / Existing Land-Use', icon: Icons.landscape),
-            const SizedBox(height: 8),
-            CustomRadioGroup(
-              selectedValue: _landCover,
-              options: _landCoverOptions,
-              crossAxisCount: 2,
-              onChanged: (v) => setState(() => _landCover = v),
-            ),
-
-            // ── SECTION C: Tree Crown Cover (Radio) ──
-            const SectionHeader(title: 'Tree Crown Cover', icon: Icons.park),
-            const SizedBox(height: 8),
-            CustomRadioGroup(
-              selectedValue: _treeCrownCover,
-              options: _treeCrownCoverOptions,
-              crossAxisCount: 1,
-              onChanged: (v) => setState(() => _treeCrownCover = v),
-            ),
-
-            // ── SECTION D: Forest Condition (Radio + Notes) ──
-            const SectionHeader(title: 'Forest Condition', icon: Icons.forest),
-            const SizedBox(height: 8),
-            CustomRadioGroup(
-              selectedValue: _forestCondition,
-              options: _forestConditionOptions,
-              crossAxisCount: 2,
-              onChanged: (v) => setState(() => _forestCondition = v),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-               controller: _forestConditionNotesCtrl,
-               decoration: _inputDecoration('Additional Notes / Description', icon: Icons.edit_note),
-               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-               maxLines: 3,
-               style: const TextStyle(fontSize: 14),
-            ),
-
-            // ── SECTION E: Forest Litter (Fillable) ──
-            const SectionHeader(title: 'Forest Litter', icon: Icons.grass),
-            const SizedBox(height: 8),
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                          controller: _litterGroundCoverCtrl,
-                          decoration: _inputDecoration('Ground Cover %', icon: Icons.percent),
-                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 14),
+                  // Descriptive text for selected option
+                  if (_treeCrownCover != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _treeCrownCover!,
+                        style: const TextStyle(color: Colors.black87),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                          controller: _litterAvgDepthCtrl,
-                          decoration: _inputDecoration('Avg Depth (cm)', icon: Icons.straighten),
-                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 14),
+
+                  // ── SECTION D: Forest Condition (Radio + Notes) ──
+                  const SectionHeader(
+                    title: 'Forest Condition',
+                    icon: Icons.forest,
+                  ),
+                  const SizedBox(height: 8),
+                  CustomRadioGroup(
+                    selectedValue: _forestCondition,
+                    options: _forestConditionOptions,
+                    crossAxisCount: 2,
+                    onChanged: (v) => setState(() => _forestCondition = v),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _forestConditionNotesCtrl,
+                    decoration: _inputDecoration(
+                      'Additional Notes / Description',
+                      icon: Icons.edit_note,
+                    ),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Required' : null,
+                    maxLines: 3,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+
+                  // ── SECTION E: Forest Litter (Fillable) ──
+                  const SectionHeader(
+                    title: 'Forest Litter',
+                    icon: Icons.grass,
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _litterGroundCoverCtrl,
+                              decoration: _inputDecoration(
+                                'Ground Cover %',
+                                icon: Icons.percent,
+                              ),
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Required'
+                                  : null,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _litterAvgDepthCtrl,
+                              decoration: _inputDecoration(
+                                'Avg Depth (cm)',
+                                icon: Icons.straighten,
+                              ),
+                              validator: (value) =>
+                                  value == null || value.isEmpty
+                                  ? 'Required'
+                                  : null,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+
+                  // ── SECTION F: Threats ──
+                  const SectionHeader(
+                    title: 'Threats',
+                    icon: Icons.warning_amber,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _threatsCtrl,
+                    decoration: _inputDecoration(
+                      'Describe any threats observed',
+                      icon: Icons.report_problem,
+                    ),
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Required' : null,
+                    maxLines: 3,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+
+                  // ── SECTION G: Inventory ──
+                  const SectionHeader(
+                    title: 'Inventory of Regenerants & Existing Trees',
+                    icon: Icons.table_chart,
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9A825).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Saplings (5–14 cm diameter) and Trees (≥ 15 cm diameter)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF33691E),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TreeInventoryTable(
+                    rows: _inventoryRows,
+                    onChanged: (rows) => setState(() => _inventoryRows = rows),
+                  ),
+
+                  // ── SECTION H: Restoration Approaches (Radio) ──
+                  const SectionHeader(
+                    title: 'Recommended Restoration Approaches',
+                    icon: Icons.eco,
+                  ),
+                  const SizedBox(height: 8),
+                  CustomRadioGroup(
+                    selectedValue: _restorationApproach,
+                    options: _restorationOptions,
+                    crossAxisCount: 2,
+                    onChanged: (v) => setState(() => _restorationApproach = v),
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
-
-            // ── SECTION F: Threats ──
-            const SectionHeader(title: 'Threats', icon: Icons.warning_amber),
-            const SizedBox(height: 8),
-            TextFormField(
-               controller: _threatsCtrl,
-               decoration: _inputDecoration('Describe any threats observed', icon: Icons.report_problem),
-               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-               maxLines: 3,
-               style: const TextStyle(fontSize: 14),
-            ),
-
-            // ── SECTION G: Inventory ──
-            const SectionHeader(
-              title: 'Inventory of Regenerants & Existing Trees',
-              icon: Icons.table_chart,
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9A825).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Saplings (5–14 cm diameter) and Trees (≥ 15 cm diameter)',
-                style: TextStyle(fontSize: 11, color: Color(0xFF33691E), fontWeight: FontWeight.w500),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TreeInventoryTable(
-              rows: _inventoryRows,
-              onChanged: (rows) => setState(() => _inventoryRows = rows),
-            ),
-
-            // ── SECTION H: Restoration Approaches (Radio) ──
-            const SectionHeader(title: 'Recommended Restoration Approaches', icon: Icons.eco),
-            const SizedBox(height: 8),
-            CustomRadioGroup(
-              selectedValue: _restorationApproach,
-              options: _restorationOptions,
-              crossAxisCount: 2,
-              onChanged: (v) => setState(() => _restorationApproach = v),
-            ),
-
-            const SizedBox(height: 32),
-          ],
-        ),
+          ),
+        ],
       ),
-    ),
-  ],
-),
       // Save button at bottom
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -562,26 +714,171 @@ class _FormScreenState extends State<FormScreen> {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.save),
             label: Text(
               _saving
                   ? 'Saving...'
                   : _isEditing
-                      ? 'Update Assessment'
-                      : 'Save Assessment',
+                  ? 'Update Assessment'
+                  : 'Save Assessment',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1B5E20),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               elevation: 2,
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RadioGridWidget extends StatelessWidget {
+  final String? selectedValue;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  const _RadioGridWidget({
+    required this.selectedValue,
+    required this.options,
+    required this.onChanged,
+  });
+
+  IconData _getIconForOption(String option) {
+    switch (option) {
+      case 'Open Forest':
+        return Icons.forest;
+      case 'Annual Crop':
+        return Icons.agriculture;
+      case 'Built-up':
+        return Icons.home_work;
+      case 'Monoculture':
+        return Icons.agriculture;
+      case 'Brushland/Shrub':
+        return Icons.nature;
+      case 'Perennial Crop':
+        return Icons.agriculture;
+      case 'Fishpond':
+        return Icons.water;
+      case 'Plantation':
+        return Icons.forest;
+      case 'Grassland':
+        return Icons.grass;
+      case 'Open/Barren':
+        return Icons.terrain;
+      case 'Inland Water':
+        return Icons.water;
+      default:
+        return Icons.more_horiz;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate item width for a 2-column grid inside Wrap (spacing is 8)
+        final itemWidth = (constraints.maxWidth - 8) / 2;
+
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((option) {
+            final isSelected = selectedValue == option;
+
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                width: itemWidth,
+                height: 85,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF1B5E20) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF1B5E20)
+                        : const Color(0xFF388E3C),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Content
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _getIconForOption(option),
+                              size: 26,
+                              color: isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF388E3C),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              option,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF1B5E20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Check Badge
+                    if (isSelected)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF1B5E20),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            size: 10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
