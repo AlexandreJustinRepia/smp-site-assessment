@@ -4,15 +4,15 @@ import '../../widgets/section_header.dart';
 import 'radio_grid.dart';
 
 class RestorationSection extends StatelessWidget {
-  final String? selectedValue;
+  final List<String> selectedValues;
   final List<String> options;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onToggled;
 
   const RestorationSection({
     super.key,
-    required this.selectedValue,
+    required this.selectedValues,
     required this.options,
-    required this.onChanged,
+    required this.onToggled,
   });
 
   @override
@@ -25,10 +25,10 @@ class RestorationSection extends StatelessWidget {
           icon: Icons.eco,
         ),
         const SizedBox(height: 8),
-        FormRadioGrid(
-          selectedValue: selectedValue,
+        FormMultiSelectGrid(
+          selectedValues: selectedValues,
           options: options,
-          onChanged: onChanged,
+          onToggled: onToggled,
         ),
       ],
     );

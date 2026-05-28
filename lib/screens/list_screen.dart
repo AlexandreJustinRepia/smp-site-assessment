@@ -39,7 +39,7 @@ class _ListScreenState extends State<ListScreen> {
         assessment.treeCrownCover,
         assessment.forestCondition,
         assessment.threats,
-        assessment.restorationApproach,
+        assessment.restorationApproaches.join(' '),
       ].join(' ').toLowerCase();
 
       return searchableText.contains(query);

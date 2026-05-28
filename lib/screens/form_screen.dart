@@ -43,7 +43,7 @@ class _FormScreenState extends State<FormScreen> {
   String? _landCover;
   String? _treeCrownCover;
   String? _forestCondition;
-  String? _restorationApproach;
+  List<String> _restorationApproaches = [];
 
   static const _landCoverOptions = [
     'Open Forest',
@@ -116,9 +116,7 @@ class _FormScreenState extends State<FormScreen> {
     _forestCondition = (a != null && a.forestCondition.isNotEmpty)
         ? a.forestCondition
         : null;
-    _restorationApproach = (a != null && a.restorationApproach.isNotEmpty)
-        ? a.restorationApproach
-        : null;
+    _restorationApproaches = a?.restorationApproaches ?? [];
     _inventoryRows =
         a?.inventoryRows
             .map(
@@ -225,7 +223,7 @@ class _FormScreenState extends State<FormScreen> {
     if (_landCover == null ||
         _treeCrownCover == null ||
         _forestCondition == null ||
-        _restorationApproach == null) {
+        _restorationApproaches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please fill all required fields'),
@@ -257,9 +255,9 @@ class _FormScreenState extends State<FormScreen> {
       forestLitterGroundCover: _litterGroundCoverCtrl.text.trim(),
       forestLitterAvgDepth: _litterAvgDepthCtrl.text.trim(),
       threats: _threatsCtrl.text.trim(),
-      restorationApproach: _restorationApproach ?? '',
       restorationRationale: '',
     );
+    assessment.setRestorationApproaches(_restorationApproaches);
     assessment.setInventoryRows(
       _inventoryRows
           .map(
@@ -417,9 +415,22 @@ class _FormScreenState extends State<FormScreen> {
                   ),
                   const SizedBox(height: 20),
                   RestorationSection(
-                    selectedValue: _restorationApproach,
+                    selectedValues: _restorationApproaches,
                     options: _restorationOptions,
-                    onChanged: (v) => setState(() => _restorationApproach = v),
+                    onToggled: (value) {
+                      setState(() {
+                        if (_restorationApproaches.contains(value)) {
+                          _restorationApproaches = _restorationApproaches
+                              .where((item) => item != value)
+                              .toList();
+                        } else {
+                          _restorationApproaches = [
+                            ..._restorationApproaches,
+                            value,
+                          ];
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: 32),
                 ],

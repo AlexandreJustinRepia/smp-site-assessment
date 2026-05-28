@@ -550,7 +550,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
-                          'RECOMMENDED RESTORATION APPROACH',
+                          'RECOMMENDED RESTORATION APPROACHES',
                           style: const pw.TextStyle(
                             color: PdfColor.fromInt(0xFFA5D6A7),
                             fontSize: 7,
@@ -558,7 +558,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         ),
                         pw.SizedBox(height: 4),
                         pw.Text(
-                          valueOrDash(a.restorationApproach),
+                          valueOrDash(a.restorationApproaches.join(', ')),
                           style: pw.TextStyle(
                             color: PdfColors.white,
                             fontSize: 11,
@@ -936,7 +936,11 @@ class _DetailScreenState extends State<DetailScreen> {
 
           // Restoration
           _buildSectionCard('Recommended Restoration Approaches', Icons.eco, [
-            _buildChip(a.restorationApproach),
+            if (a.restorationApproaches.isEmpty)
+              _buildChip('-')
+            else
+              for (final approach in a.restorationApproaches)
+                _buildChip(approach),
           ]),
 
           const SizedBox(height: 24),

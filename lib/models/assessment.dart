@@ -72,7 +72,7 @@ class Assessment {
   // Section G – Inventory rows (JSON-encoded list)
   String inventoryJson;
 
-  // Section H – Recommended Restoration Approach (radio, one of 6)
+  // Section H – Recommended Restoration Approaches
   String restorationApproach;
   String restorationRationale;
 
@@ -107,6 +107,23 @@ class Assessment {
 
   void setInventoryRows(List<InventoryRow> rows) {
     inventoryJson = jsonEncode(rows.map((r) => r.toMap()).toList());
+  }
+
+  List<String> get restorationApproaches {
+    if (restorationApproach.trim().isEmpty) return [];
+    try {
+      final decoded = jsonDecode(restorationApproach);
+      if (decoded is List) {
+        return decoded.map((value) => value.toString()).toList();
+      }
+    } catch (_) {
+      // Legacy records stored a single selected approach as plain text.
+    }
+    return [restorationApproach];
+  }
+
+  void setRestorationApproaches(List<String> approaches) {
+    restorationApproach = jsonEncode(approaches);
   }
 
   Map<String, dynamic> toMap() => {
