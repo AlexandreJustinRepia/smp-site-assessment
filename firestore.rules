@@ -30,14 +30,50 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
-    match /assessments/{assessmentId} {
+    function isAccessManager() {
+      return hasRole('access_manager');
+    }
+
+    function canManageUsers() {
+      return isAdmin() || isAccessManager();
+    }
+
+    function validAdminManagedRole() {
+      return request.resource.data.role in [
+        'viewer',
+        'editor',
+        'access_manager',
+        'admin'
+      ];
+    }
+
+    function validAccessManagerManagedRole() {
+      return request.resource.data.role in [
+        'viewer',
+        'editor',
+        'access_manager'
+      ];
+    }
+
+    function isProtectedAdminTarget() {
+      return resource.data.role == 'admin';
+    }
+
+    match /assessments/{document=**} {
+      allow read: if isApproved();
+      allow create, update: if hasRole('admin') || hasRole('editor');
+      allow delete: if isAdmin();
+    }
+
+    match /site_assessments/{document=**} {
       allow read: if isApproved();
       allow create, update: if hasRole('admin') || hasRole('editor');
       allow delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if signedIn()
+        && (request.auth.uid == userId || canManageUsers());
 
       allow create: if signedIn()
         && request.auth.uid == userId
@@ -49,9 +85,18 @@ service cloud.firestore {
 
       allow update: if (
           isAdmin()
+          && !isProtectedAdminTarget()
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['role', 'approved', 'updatedAt'])
-          && request.resource.data.role in ['viewer', 'editor', 'admin']
+          && validAdminManagedRole()
+          && request.resource.data.approved is bool
+        )
+        || (
+          isAccessManager()
+          && !isProtectedAdminTarget()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['role', 'approved', 'updatedAt'])
+          && validAccessManagerManagedRole()
           && request.resource.data.approved is bool
         )
         || (
@@ -63,7 +108,7 @@ service cloud.firestore {
           && request.resource.data.name.size() >= 2
         );
 
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() && !isProtectedAdminTarget();
     }
   }
 }

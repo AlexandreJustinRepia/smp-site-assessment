@@ -21,6 +21,8 @@ class AppUserAccess {
   });
 
   bool get isAdmin => approved && role == 'admin';
+  bool get isAccessManager => approved && role == 'access_manager';
+  bool get canManageUsers => isAdmin || isAccessManager;
   bool get canEdit => approved && (role == 'admin' || role == 'editor');
   bool get canDelete => isAdmin;
 

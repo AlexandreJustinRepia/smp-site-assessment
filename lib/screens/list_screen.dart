@@ -239,13 +239,15 @@ class _ListScreenState extends State<ListScreen> {
             pinned: true,
             elevation: 4,
             actions: [
-              if (widget.access.isAdmin)
+              if (widget.access.canManageUsers)
                 IconButton(
                   onPressed: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const AdminUsersScreen(),
+                        builder: (_) => AdminUsersScreen(
+                          currentAccess: widget.access,
+                        ),
                       ),
                     );
                   },

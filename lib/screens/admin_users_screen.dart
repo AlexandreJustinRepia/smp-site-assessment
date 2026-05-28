@@ -3,12 +3,20 @@ import 'package:flutter/material.dart';
 import '../services/user_access_service.dart';
 
 class AdminUsersScreen extends StatelessWidget {
-  const AdminUsersScreen({super.key});
+  final AppUserAccess currentAccess;
 
-  static const _roles = ['viewer', 'editor', 'admin'];
+  const AdminUsersScreen({
+    super.key,
+    required this.currentAccess,
+  });
+
+  static const _adminRoles = ['viewer', 'editor', 'access_manager', 'admin'];
+  static const _accessManagerRoles = ['viewer', 'editor', 'access_manager'];
 
   @override
   Widget build(BuildContext context) {
+    final roles = currentAccess.isAdmin ? _adminRoles : _accessManagerRoles;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Access'),
@@ -47,7 +55,11 @@ class AdminUsersScreen extends StatelessWidget {
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final user = users[index];
-              return _UserAccessTile(user: user, roles: _roles);
+              return _UserAccessTile(
+                user: user,
+                roles: roles,
+                currentAccess: currentAccess,
+              );
             },
           );
         },
@@ -59,10 +71,12 @@ class AdminUsersScreen extends StatelessWidget {
 class _UserAccessTile extends StatefulWidget {
   final AppUserAccess user;
   final List<String> roles;
+  final AppUserAccess currentAccess;
 
   const _UserAccessTile({
     required this.user,
     required this.roles,
+    required this.currentAccess,
   });
 
   @override
@@ -99,7 +113,12 @@ class _UserAccessTileState extends State<_UserAccessTile> {
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
-    final role = widget.roles.contains(user.role) ? user.role : 'viewer';
+    final adminProtected = user.role == 'admin';
+    final roleOptions = widget.roles.contains(user.role)
+        ? widget.roles
+        : [...widget.roles, user.role];
+    final role = roleOptions.contains(user.role) ? user.role : 'viewer';
+    final canUpdateUser = widget.currentAccess.canManageUsers && !adminProtected;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -170,6 +189,28 @@ class _UserAccessTileState extends State<_UserAccessTile> {
               ],
             ),
             const SizedBox(height: 14),
+            if (adminProtected) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Protected admin account',
+                  style: TextStyle(
+                    color: Color(0xFF1B5E20),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
@@ -179,7 +220,7 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                       labelText: 'Role',
                       prefixIcon: Icon(Icons.admin_panel_settings_outlined),
                     ),
-                    items: widget.roles
+                    items: roleOptions
                         .map(
                           (role) => DropdownMenuItem(
                             value: role,
@@ -187,7 +228,7 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                           ),
                         )
                         .toList(),
-                    onChanged: _busy
+                    onChanged: _busy || !canUpdateUser
                         ? null
                         : (value) {
                             if (value != null) _save(role: value);
@@ -198,7 +239,9 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                 Switch(
                   value: user.approved,
                   onChanged:
-                      _busy ? null : (value) => _save(approved: value),
+                      _busy || !canUpdateUser
+                          ? null
+                          : (value) => _save(approved: value),
                 ),
               ],
             ),
