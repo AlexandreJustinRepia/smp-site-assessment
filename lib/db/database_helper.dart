@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -32,6 +32,7 @@ class DatabaseHelper {
       CREATE TABLE assessments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         firestoreId TEXT,
+        updatedAt TEXT NOT NULL DEFAULT '',
         gridNo TEXT NOT NULL DEFAULT '',
         centroidNo TEXT NOT NULL DEFAULT '',
         elevation TEXT NOT NULL DEFAULT '',
@@ -66,6 +67,11 @@ class DatabaseHelper {
         'ALTER TABLE assessments ADD COLUMN firestoreId TEXT',
       );
     }
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE assessments ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ""',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -74,10 +80,19 @@ class DatabaseHelper {
 
   Future<int> create(Assessment assessment) async {
     final db = await database;
-    final id = await db.insert('assessments', assessment.toMap());
+    final local = assessment.copyWith(
+      firestoreId: assessment.firestoreId ?? _newLocalFirestoreId(),
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    final id = await db.insert('assessments', local.toMap());
     // Push to Firestore in the background (won't block the UI)
-    _syncToFirestore(assessment.copyWith(id: id));
+    _syncToFirestore(local.copyWith(id: id));
     return id;
+  }
+
+  Future<int> insertSynced(Assessment assessment) async {
+    final db = await database;
+    return db.insert('assessments', assessment.toMap());
   }
 
   Future<Assessment?> read(int id) async {
@@ -99,14 +114,27 @@ class DatabaseHelper {
 
   Future<int> update(Assessment assessment) async {
     final db = await database;
+    final local = assessment.copyWith(
+      updatedAt: DateTime.now().toIso8601String(),
+    );
     final rows = await db.update(
+      'assessments',
+      local.toMap(),
+      where: 'id = ?',
+      whereArgs: [local.id],
+    );
+    _syncToFirestore(local);
+    return rows;
+  }
+
+  Future<int> applyRemoteUpdate(Assessment assessment) async {
+    final db = await database;
+    return db.update(
       'assessments',
       assessment.toMap(),
       where: 'id = ?',
       whereArgs: [assessment.id],
     );
-    _syncToFirestore(assessment);
-    return rows;
   }
 
   Future<int> delete(int id) async {
@@ -139,17 +167,26 @@ class DatabaseHelper {
     try {
       final remote = await FirestoreService.instance.fetchAll();
       final local = await readAll();
-      final localFirestoreIds =
-          local.map((a) => a.firestoreId).whereType<String>().toSet();
 
       int imported = 0;
       for (final remoteAssessment in remote) {
-        if (remoteAssessment.firestoreId != null &&
-            localFirestoreIds.contains(remoteAssessment.firestoreId)) {
-          continue; // Already have this record
+        Assessment? localAssessment;
+        for (final assessment in local) {
+          if (assessment.firestoreId == remoteAssessment.firestoreId) {
+            localAssessment = assessment;
+            break;
+          }
         }
-        final db = await database;
-        await db.insert('assessments', remoteAssessment.toMap());
+        if (localAssessment != null) {
+          if (_isNewer(remoteAssessment.updatedAt, localAssessment.updatedAt)) {
+            await applyRemoteUpdate(
+              remoteAssessment.copyWith(id: localAssessment.id),
+            );
+            imported++;
+          }
+          continue;
+        }
+        await insertSynced(remoteAssessment);
         imported++;
       }
       return imported;
@@ -158,15 +195,12 @@ class DatabaseHelper {
     }
   }
 
-  /// Pushes all un-synced local records to Firestore.
+  /// Pushes local records to Firestore after the app comes back online.
   Future<void> syncUnsyncedToFirestore() async {
     if (!await _isOnline()) return;
     try {
       final db = await database;
-      final unsynced = await db.query(
-        'assessments',
-        where: 'firestoreId IS NULL',
-      );
+      final unsynced = await db.query('assessments');
       for (final map in unsynced) {
         final assessment = Assessment.fromMap(map);
         await _syncToFirestore(assessment);
@@ -181,6 +215,14 @@ class DatabaseHelper {
   Future<void> _syncToFirestore(Assessment assessment) async {
     if (!await _isOnline()) return;
     try {
+      final firestoreId = assessment.firestoreId;
+      if (firestoreId != null && firestoreId.isNotEmpty) {
+        final remote = await FirestoreService.instance.read(firestoreId);
+        if (remote != null && !_isNewer(assessment.updatedAt, remote.updatedAt)) {
+          return;
+        }
+      }
+
       final docId = await FirestoreService.instance.upsert(assessment);
       // Persist the Firestore doc ID locally so we can do targeted updates
       final db = await database;
@@ -209,5 +251,17 @@ class DatabaseHelper {
     return result.contains(ConnectivityResult.mobile) ||
         result.contains(ConnectivityResult.wifi) ||
         result.contains(ConnectivityResult.ethernet);
+  }
+
+  bool _isNewer(String candidate, String current) {
+    final candidateDate = DateTime.tryParse(candidate);
+    final currentDate = DateTime.tryParse(current);
+    if (candidateDate == null) return false;
+    if (currentDate == null) return true;
+    return candidateDate.isAfter(currentDate);
+  }
+
+  String _newLocalFirestoreId() {
+    return 'local_${DateTime.now().microsecondsSinceEpoch}';
   }
 }

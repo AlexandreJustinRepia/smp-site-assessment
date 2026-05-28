@@ -36,7 +36,7 @@ class SyncNoInternetException implements Exception {
 }
 
 class SyncService {
-  static const _collection = 'site_assessments';
+  static const _collection = 'assessments';
   static const _schemaVersion = 1;
 
   Future<SyncResult?> syncAssessments() async {
@@ -54,10 +54,16 @@ class SyncService {
 
     final firestore = FirebaseFirestore.instance;
     final localAssessments = await DatabaseHelper.instance.readAll();
+    final localByFirestoreId = <String, Assessment>{};
     final localByFingerprint = <String, Assessment>{};
     var skipped = 0;
 
     for (final assessment in localAssessments) {
+      final firestoreId = assessment.firestoreId;
+      if (firestoreId != null && firestoreId.isNotEmpty) {
+        localByFirestoreId[firestoreId] = assessment;
+      }
+
       final fingerprint = _fingerprint(_toSyncMap(assessment));
       if (localByFingerprint.containsKey(fingerprint)) {
         skipped++;
@@ -67,11 +73,14 @@ class SyncService {
     }
 
     final remoteSnapshot = await firestore.collection(_collection).get();
+    final remoteById = <String, Map<String, dynamic>>{};
     final remoteByFingerprint = <String, Map<String, dynamic>>{};
 
     for (final doc in remoteSnapshot.docs) {
       final data = Map<String, dynamic>.from(doc.data());
       final assessmentMap = _assessmentDataFromRemote(data);
+      assessmentMap['firestoreId'] = doc.id;
+      remoteById[doc.id] = assessmentMap;
       final fingerprint = _fingerprint(assessmentMap);
       if (remoteByFingerprint.containsKey(fingerprint)) {
         skipped++;
@@ -81,14 +90,29 @@ class SyncService {
     }
 
     final batch = firestore.batch();
+    final firestoreIdAssignments = <Assessment, String>{};
     var uploaded = 0;
 
-    for (final entry in localByFingerprint.entries) {
-      if (remoteByFingerprint.containsKey(entry.key)) continue;
+    for (final assessment in localByFingerprint.values) {
+      var firestoreId = assessment.firestoreId;
+      final fingerprint = _fingerprint(_toSyncMap(assessment));
+      final matchingRemote = remoteByFingerprint[fingerprint];
 
-      final doc = firestore.collection(_collection).doc(_documentId(entry.key));
+      firestoreId ??= matchingRemote?['firestoreId'] as String?;
+      firestoreId ??= firestore.collection(_collection).doc().id;
+      if (assessment.firestoreId == null || assessment.firestoreId!.isEmpty) {
+        firestoreIdAssignments[assessment] = firestoreId;
+      }
+
+      final remote = remoteById[firestoreId];
+      if (remote != null && !_isNewer(assessment.updatedAt, remote['updatedAt'])) {
+        skipped++;
+        continue;
+      }
+
+      final doc = firestore.collection(_collection).doc(firestoreId);
       batch.set(doc, {
-        ..._toSyncMap(entry.value),
+        ..._toSyncMap(assessment),
         'schemaVersion': _schemaVersion,
         'syncedAt': FieldValue.serverTimestamp(),
       });
@@ -99,17 +123,35 @@ class SyncService {
       await batch.commit();
     }
 
-    var downloaded = 0;
-    final seen = localByFingerprint.keys.toSet();
+    for (final entry in firestoreIdAssignments.entries) {
+      await DatabaseHelper.instance.applyRemoteUpdate(
+        entry.key.copyWith(firestoreId: entry.value),
+      );
+    }
 
-    for (final entry in remoteByFingerprint.entries) {
-      if (seen.contains(entry.key)) {
+    var downloaded = 0;
+
+    for (final entry in remoteById.entries) {
+      final local = localByFirestoreId[entry.key];
+      if (local != null) {
+        if (_isNewer(entry.value['updatedAt'], local.updatedAt)) {
+          await DatabaseHelper.instance.applyRemoteUpdate(
+            _fromSyncMap(entry.value).copyWith(id: local.id),
+          );
+          downloaded++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
+      final fingerprint = _fingerprint(entry.value);
+      if (localByFingerprint.containsKey(fingerprint)) {
         skipped++;
         continue;
       }
 
-      await DatabaseHelper.instance.create(_fromSyncMap(entry.value));
-      seen.add(entry.key);
+      await DatabaseHelper.instance.insertSynced(_fromSyncMap(entry.value));
       downloaded++;
     }
 
@@ -124,6 +166,7 @@ class SyncService {
 
   Map<String, dynamic> _toSyncMap(Assessment assessment) {
     final map = Map<String, dynamic>.from(assessment.toMap())..remove('id');
+    map.remove('firestoreId');
     map['inventory'] = assessment.inventoryRows
         .map((row) => row.toMap())
         .toList();
@@ -158,6 +201,8 @@ class SyncService {
       'inventoryJson': map['inventoryJson'] ?? '[]',
       'restorationApproach': map['restorationApproach'] ?? '',
       'restorationRationale': map['restorationRationale'] ?? '',
+      'firestoreId': map['firestoreId'],
+      'updatedAt': map['updatedAt'] ?? DateTime.now().toIso8601String(),
     });
 
     final inventory = map['inventory'];
@@ -177,17 +222,12 @@ class SyncService {
     return jsonEncode(_normalize(map));
   }
 
-  String _documentId(String fingerprint) {
-    const offsetBasis = 0xcbf29ce484222325;
-    const prime = 0x100000001b3;
-    var hash = offsetBasis;
-
-    for (final unit in utf8.encode(fingerprint)) {
-      hash ^= unit;
-      hash = (hash * prime) & 0xFFFFFFFFFFFFFFFF;
-    }
-
-    return hash.toRadixString(16).padLeft(16, '0');
+  bool _isNewer(Object? candidate, Object? current) {
+    final candidateDate = DateTime.tryParse(candidate?.toString() ?? '');
+    final currentDate = DateTime.tryParse(current?.toString() ?? '');
+    if (candidateDate == null) return false;
+    if (currentDate == null) return true;
+    return candidateDate.isAfter(currentDate);
   }
 
   Object? _normalize(Object? value) {
@@ -196,7 +236,7 @@ class SyncService {
         ..sort();
       return {
         for (final key in sortedKeys)
-          if (key != 'id') key: _normalize(value[key]),
+          if (!_ignoredSyncKeys.contains(key)) key: _normalize(value[key]),
       };
     }
     if (value is List) {
@@ -204,4 +244,12 @@ class SyncService {
     }
     return value ?? '';
   }
+
+  static const _ignoredSyncKeys = {
+    'id',
+    'firestoreId',
+    'schemaVersion',
+    'syncedAt',
+    'updatedAt',
+  };
 }

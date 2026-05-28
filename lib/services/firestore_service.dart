@@ -5,13 +5,15 @@ import '../models/assessment.dart';
 /// Handles all Cloud Firestore read/write operations for [Assessment] records.
 ///
 /// Every assessment is stored as a document in the top-level `assessments`
-/// collection.  The Firestore document ID is derived from the record's
-/// composite key so that the same field data is never written twice.
+/// collection. The document ID is preserved locally so edits update the same
+/// remote record.
 class FirestoreService {
   static final FirestoreService instance = FirestoreService._();
   FirestoreService._();
 
   final _col = FirebaseFirestore.instance.collection('assessments');
+
+  String newId() => _col.doc().id;
 
   // ---------------------------------------------------------------------------
   // Write
@@ -22,7 +24,7 @@ class FirestoreService {
   /// Throws a [FirebaseException] (or any other error) on failure; callers
   /// should handle this gracefully so the app keeps working offline.
   Future<String> upsert(Assessment assessment) async {
-    final docId = _docId(assessment);
+    final docId = assessment.firestoreId ?? newId();
     final data = _toFirestoreMap(assessment);
     await _col.doc(docId).set(data, SetOptions(merge: true));
     return docId;
@@ -43,6 +45,12 @@ class FirestoreService {
     return snap.docs.map((doc) => _fromFirestoreDoc(doc)).toList();
   }
 
+  Future<Assessment?> read(String firestoreId) async {
+    final doc = await _col.doc(firestoreId).get();
+    if (!doc.exists) return null;
+    return _fromFirestoreDoc(doc);
+  }
+
   /// Streams all assessments in real-time (optional — wire up if you want
   /// live updates in the UI without manual refreshes).
   Stream<List<Assessment>> watchAll() {
@@ -55,19 +63,10 @@ class FirestoreService {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /// Builds a stable, human-readable document ID from a few key fields.
-  /// Using a deterministic ID prevents duplicate uploads.
-  String _docId(Assessment assessment) {
-    final parts = [
-      assessment.gridNo.trim(),
-      assessment.centroidNo.trim(),
-      assessment.date.trim(),
-    ].map((s) => s.replaceAll(RegExp(r'[^\w-]'), '_')).join('__');
-    return parts.isEmpty ? _col.doc().id : parts;
-  }
-
   Map<String, dynamic> _toFirestoreMap(Assessment assessment) {
     final map = assessment.toMap();
+    map.remove('id');
+    map.remove('firestoreId');
     // Replace the JSON-encoded inventory string with a proper Firestore list
     map.remove('inventoryJson');
     map['inventory'] =

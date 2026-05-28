@@ -240,6 +240,8 @@ class _FormScreenState extends State<FormScreen> {
 
     final assessment = Assessment(
       id: widget.assessment?.id,
+      firestoreId: widget.assessment?.firestoreId,
+      updatedAt: widget.assessment?.updatedAt,
       gridNo: _gridNoCtrl.text.trim(),
       centroidNo: _centroidNoCtrl.text.trim(),
       elevation: _elevationCtrl.text.trim(),

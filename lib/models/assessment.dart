@@ -39,6 +39,9 @@ class Assessment {
   /// Stored locally in SQLite; never written to Firestore itself.
   String? firestoreId;
 
+  /// Local ISO-8601 timestamp used to decide which edited copy is newest.
+  String updatedAt;
+
   // Header fields
   String gridNo;
   String centroidNo;
@@ -76,6 +79,7 @@ class Assessment {
   Assessment({
     this.id,
     this.firestoreId,
+    String? updatedAt,
     this.gridNo = '',
     this.centroidNo = '',
     this.elevation = '',
@@ -94,7 +98,7 @@ class Assessment {
     this.inventoryJson = '[]',
     this.restorationApproach = '',
     this.restorationRationale = '',
-  });
+  }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   List<InventoryRow> get inventoryRows {
     final decoded = jsonDecode(inventoryJson) as List;
@@ -108,6 +112,7 @@ class Assessment {
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
         if (firestoreId != null) 'firestoreId': firestoreId,
+        'updatedAt': updatedAt,
         'gridNo': gridNo,
         'centroidNo': centroidNo,
         'elevation': elevation,
@@ -131,6 +136,7 @@ class Assessment {
   factory Assessment.fromMap(Map<String, dynamic> map) => Assessment(
         id: map['id'] as int?,
         firestoreId: map['firestoreId'] as String?,
+        updatedAt: map['updatedAt'] ?? DateTime.now().toIso8601String(),
         gridNo: map['gridNo'] ?? '',
         centroidNo: map['centroidNo'] ?? '',
         elevation: map['elevation'] ?? '',
@@ -154,6 +160,7 @@ class Assessment {
   Assessment copyWith({
     int? id,
     String? firestoreId,
+    String? updatedAt,
     String? gridNo,
     String? centroidNo,
     String? elevation,
@@ -176,6 +183,7 @@ class Assessment {
       Assessment(
         id: id ?? this.id,
         firestoreId: firestoreId ?? this.firestoreId,
+        updatedAt: updatedAt ?? this.updatedAt,
         gridNo: gridNo ?? this.gridNo,
         centroidNo: centroidNo ?? this.centroidNo,
         elevation: elevation ?? this.elevation,
