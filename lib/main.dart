@@ -1,31 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'db/database_helper.dart';
-import 'screens/list_screen.dart';
+
+import 'screens/loading_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _initializeFirebase();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   runApp(const SiteAssessmentApp());
-}
-
-Future<void> _initializeFirebase() async {
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    // Sync in background — don't await so the app starts immediately
-    DatabaseHelper.instance.syncUnsyncedToFirestore();
-    DatabaseHelper.instance.syncFromFirestore();
-  } catch (_) {
-    // The app remains fully functional offline.
-  }
 }
 
 class SiteAssessmentApp extends StatelessWidget {
@@ -93,7 +77,7 @@ class SiteAssessmentApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const ListScreen(),
+      home: const LoadingScreen(),
     );
   }
 }
