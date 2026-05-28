@@ -3,11 +3,15 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
 import '../services/sync_service.dart';
+import '../services/user_access_service.dart';
+import 'admin_users_screen.dart';
 import 'form_screen.dart';
 import 'detail_screen.dart';
 
 class ListScreen extends StatefulWidget {
-  const ListScreen({super.key});
+  final AppUserAccess access;
+
+  const ListScreen({super.key, required this.access});
 
   @override
   State<ListScreen> createState() => _ListScreenState();
@@ -234,6 +238,19 @@ class _ListScreenState extends State<ListScreen> {
             pinned: true,
             elevation: 4,
             actions: [
+              if (widget.access.isAdmin)
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AdminUsersScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  tooltip: 'User access',
+                ),
               IconButton(
                 onPressed: _syncBusy ? null : _syncAssessments,
                 icon: _syncBusy
@@ -247,6 +264,11 @@ class _ListScreenState extends State<ListScreen> {
                       )
                     : const Icon(Icons.sync),
                 tooltip: 'Sync assessments',
+              ),
+              IconButton(
+                onPressed: UserAccessService.instance.signOut,
+                icon: const Icon(Icons.logout),
+                tooltip: 'Sign out',
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -571,7 +593,9 @@ class _ListScreenState extends State<ListScreen> {
 
                 return Dismissible(
                   key: Key('assessment_${a.id}'),
-                  direction: DismissDirection.endToStart,
+                  direction: widget.access.canDelete
+                      ? DismissDirection.endToStart
+                      : DismissDirection.none,
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 24),
@@ -622,7 +646,10 @@ class _ListScreenState extends State<ListScreen> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => DetailScreen(assessment: a),
+                          builder: (_) => DetailScreen(
+                            assessment: a,
+                            access: widget.access,
+                          ),
                         ),
                       );
                       if (!mounted) return;
@@ -776,21 +803,23 @@ class _ListScreenState extends State<ListScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const FormScreen()),
-          );
-          if (!mounted) return;
-          _loadAssessments();
-        },
-        backgroundColor: const Color(0xFF1B5E20),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('New Assessment'),
-        elevation: 4,
-      ),
+      floatingActionButton: widget.access.canEdit
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FormScreen()),
+                );
+                if (!mounted) return;
+                _loadAssessments();
+              },
+              backgroundColor: const Color(0xFF1B5E20),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('New Assessment'),
+              elevation: 4,
+            )
+          : null,
     );
   }
 }

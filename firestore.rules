@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function hasUserDoc() {
+      return signedIn() && exists(userPath(request.auth.uid));
+    }
+
+    function currentUser() {
+      return get(userPath(request.auth.uid)).data;
+    }
+
+    function isApproved() {
+      return hasUserDoc() && currentUser().approved == true;
+    }
+
+    function hasRole(role) {
+      return isApproved() && currentUser().role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    match /assessments/{assessmentId} {
+      allow read: if isApproved();
+      allow create, update: if hasRole('admin') || hasRole('editor');
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'viewer'
+        && request.resource.data.approved == false;
+
+      allow update, delete: if isAdmin();
+    }
+  }
+}

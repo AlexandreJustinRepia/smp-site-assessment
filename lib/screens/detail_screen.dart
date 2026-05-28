@@ -6,12 +6,18 @@ import 'package:printing/printing.dart';
 
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
+import '../services/user_access_service.dart';
 import 'form_screen.dart';
 
 class DetailScreen extends StatefulWidget {
   final Assessment assessment;
+  final AppUserAccess access;
 
-  const DetailScreen({super.key, required this.assessment});
+  const DetailScreen({
+    super.key,
+    required this.assessment,
+    required this.access,
+  });
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -698,23 +704,25 @@ class _DetailScreenState extends State<DetailScreen> {
             tooltip: 'Export to PDF',
             onPressed: _exportingPdf ? null : _exportPdf,
           ),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: 'Edit',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => FormScreen(assessment: a)),
-              );
-              if (!mounted) return;
-              _refresh();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete',
-            onPressed: _delete,
-          ),
+          if (widget.access.canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Edit',
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => FormScreen(assessment: a)),
+                );
+                if (!mounted) return;
+                _refresh();
+              },
+            ),
+          if (widget.access.canDelete)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete',
+              onPressed: _delete,
+            ),
         ],
       ),
       backgroundColor: const Color(0xFFF1F8E9),

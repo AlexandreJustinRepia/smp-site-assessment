@@ -37,6 +37,7 @@ dependencies:
   pdf: ^3.11.1            # PDF generation (fully offline)
   printing: ^5.13.1       # PDF preview / share / save
   firebase_core: ^4.2.1   # Firebase app initialization
+  firebase_auth: ^6.1.2   # Email/password sign-in for app access
   cloud_firestore: ^6.1.0 # Online assessment sync
   connectivity_plus: ^6.1.4  # Online/offline detection for sync
   google_fonts: ^6.2.1

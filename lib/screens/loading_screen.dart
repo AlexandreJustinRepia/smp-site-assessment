@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../db/database_helper.dart';
 import '../firebase_options.dart';
-import 'list_screen.dart';
+import 'auth_gate.dart';
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});
@@ -49,7 +49,7 @@ class _LoadingScreenState extends State<LoadingScreen>
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) => const ListScreen(),
+        pageBuilder: (_, __, ___) => const AuthGate(),
         transitionDuration: const Duration(milliseconds: 280),
         transitionsBuilder: (_, animation, __, child) {
           return FadeTransition(opacity: animation, child: child);
