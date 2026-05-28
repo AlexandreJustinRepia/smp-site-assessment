@@ -10,12 +10,14 @@ import '../models/assessment.dart';
 class SyncResult {
   final int uploaded;
   final int downloaded;
+  final int deleted;
   final int skipped;
   final int total;
 
   const SyncResult({
     required this.uploaded,
     required this.downloaded,
+    required this.deleted,
     required this.skipped,
     required this.total,
   });
@@ -53,6 +55,21 @@ class SyncService {
     }
 
     final firestore = FirebaseFirestore.instance;
+    final pendingDeleteIds = await DatabaseHelper.instance.readPendingDeleteIds();
+    var deleted = 0;
+
+    if (pendingDeleteIds.isNotEmpty) {
+      final deleteBatch = firestore.batch();
+      for (final firestoreId in pendingDeleteIds) {
+        deleteBatch.delete(firestore.collection(_collection).doc(firestoreId));
+      }
+      await deleteBatch.commit();
+      deleted = pendingDeleteIds.length;
+      for (final firestoreId in pendingDeleteIds) {
+        await DatabaseHelper.instance.clearPendingDelete(firestoreId);
+      }
+    }
+
     final localAssessments = await DatabaseHelper.instance.readAll();
     final localByFirestoreId = <String, Assessment>{};
     final localByFingerprint = <String, Assessment>{};
@@ -159,6 +176,7 @@ class SyncService {
     return SyncResult(
       uploaded: uploaded,
       downloaded: downloaded,
+      deleted: deleted,
       skipped: skipped,
       total: total,
     );

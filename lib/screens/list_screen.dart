@@ -154,7 +154,7 @@ class _ListScreenState extends State<ListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded, ${result.skipped} skipped, ${result.total} total',
+            'Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded, ${result.deleted} deleted, ${result.skipped} skipped, ${result.total} total',
           ),
         ),
       );

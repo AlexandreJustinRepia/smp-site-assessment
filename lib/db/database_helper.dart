@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -53,6 +53,7 @@ class DatabaseHelper {
         restorationRationale TEXT NOT NULL DEFAULT ''
       )
     ''');
+    await _createPendingDeletesTable(db);
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -72,6 +73,18 @@ class DatabaseHelper {
         'ALTER TABLE assessments ADD COLUMN updatedAt TEXT NOT NULL DEFAULT ""',
       );
     }
+    if (oldVersion < 5) {
+      await _createPendingDeletesTable(db);
+    }
+  }
+
+  Future<void> _createPendingDeletesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS pending_assessment_deletes (
+        firestoreId TEXT PRIMARY KEY,
+        deletedAt TEXT NOT NULL
+      )
+    ''');
   }
 
   // ---------------------------------------------------------------------------
@@ -84,6 +97,7 @@ class DatabaseHelper {
       firestoreId: assessment.firestoreId ?? _newLocalFirestoreId(),
       updatedAt: DateTime.now().toIso8601String(),
     );
+    await _clearPendingDelete(local.firestoreId);
     final id = await db.insert('assessments', local.toMap());
     // Push to Firestore in the background (won't block the UI)
     _syncToFirestore(local.copyWith(id: id));
@@ -139,16 +153,33 @@ class DatabaseHelper {
 
   Future<int> delete(int id) async {
     final db = await database;
-    // Best-effort delete from Firestore before removing locally
     final assessment = await read(id);
-    if (assessment?.firestoreId != null) {
-      _deleteFromFirestore(assessment!.firestoreId!);
+    final firestoreId = assessment?.firestoreId;
+    if (firestoreId != null && firestoreId.isNotEmpty) {
+      await _queuePendingDelete(firestoreId);
+      _deleteFromFirestore(firestoreId);
     }
     return await db.delete(
       'assessments',
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<List<String>> readPendingDeleteIds() async {
+    final db = await database;
+    final result = await db.query(
+      'pending_assessment_deletes',
+      orderBy: 'deletedAt ASC',
+    );
+    return result
+        .map((row) => row['firestoreId']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> clearPendingDelete(String firestoreId) async {
+    await _clearPendingDelete(firestoreId);
   }
 
   Future close() async {
@@ -199,6 +230,7 @@ class DatabaseHelper {
   Future<void> syncUnsyncedToFirestore() async {
     if (!await _isOnline()) return;
     try {
+      await _syncPendingDeletesToFirestore();
       final db = await database;
       final unsynced = await db.query('assessments');
       for (final map in unsynced) {
@@ -207,6 +239,15 @@ class DatabaseHelper {
       }
     } catch (_) {
       // Silently fail
+    }
+  }
+
+  Future<void> _syncPendingDeletesToFirestore() async {
+    final pendingIds = await readPendingDeleteIds();
+    for (final firestoreId in pendingIds) {
+      if (await _deleteFromFirestore(firestoreId)) {
+        await _clearPendingDelete(firestoreId);
+      }
     }
   }
 
@@ -237,13 +278,38 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> _deleteFromFirestore(String firestoreId) async {
-    if (!await _isOnline()) return;
+  Future<bool> _deleteFromFirestore(String firestoreId) async {
+    if (!await _isOnline()) return false;
     try {
       await FirestoreService.instance.delete(firestoreId);
+      await _clearPendingDelete(firestoreId);
+      return true;
     } catch (_) {
       // Silently fail
+      return false;
     }
+  }
+
+  Future<void> _queuePendingDelete(String firestoreId) async {
+    final db = await database;
+    await db.insert(
+      'pending_assessment_deletes',
+      {
+        'firestoreId': firestoreId,
+        'deletedAt': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> _clearPendingDelete(String? firestoreId) async {
+    if (firestoreId == null || firestoreId.isEmpty) return;
+    final db = await database;
+    await db.delete(
+      'pending_assessment_deletes',
+      where: 'firestoreId = ?',
+      whereArgs: [firestoreId],
+    );
   }
 
   Future<bool> _isOnline() async {
