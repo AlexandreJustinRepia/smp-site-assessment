@@ -21,19 +21,42 @@ class AuthGate extends StatelessWidget {
           return const LoginScreen();
         }
 
+        return _AccessGate(email: authSnapshot.data?.email);
+      },
+    );
+  }
+}
+
+class _AccessGate extends StatelessWidget {
+  final String? email;
+
+  const _AccessGate({this.email});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<AppUserAccess?>(
+      future: UserAccessService.instance.readCachedCurrentAccess(),
+      builder: (context, cachedSnapshot) {
+        final cachedAccess = cachedSnapshot.data;
+
         return StreamBuilder<AppUserAccess?>(
           stream: UserAccessService.instance.watchCurrentAccess(),
           builder: (context, accessSnapshot) {
-            if (accessSnapshot.connectionState == ConnectionState.waiting) {
+            final access = accessSnapshot.data;
+            if (access != null && access.approved) {
+              return ListScreen(access: access);
+            }
+
+            if (cachedAccess != null && cachedAccess.approved) {
+              return ListScreen(access: cachedAccess);
+            }
+
+            if (accessSnapshot.connectionState == ConnectionState.waiting ||
+                cachedSnapshot.connectionState == ConnectionState.waiting) {
               return const _CenteredStatus(message: 'Loading permissions');
             }
 
-            final access = accessSnapshot.data;
-            if (access == null || !access.approved) {
-              return PendingApprovalScreen(email: authSnapshot.data?.email);
-            }
-
-            return ListScreen(access: access);
+            return PendingApprovalScreen(email: email);
           },
         );
       },

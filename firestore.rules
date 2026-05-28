@@ -47,7 +47,23 @@ service cloud.firestore {
         && request.resource.data.role == 'viewer'
         && request.resource.data.approved == false;
 
-      allow update, delete: if isAdmin();
+      allow update: if (
+          isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['role', 'approved', 'updatedAt'])
+          && request.resource.data.role in ['viewer', 'editor', 'admin']
+          && request.resource.data.approved is bool
+        )
+        || (
+          signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'updatedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() >= 2
+        );
+
+      allow delete: if isAdmin();
     }
   }
 }

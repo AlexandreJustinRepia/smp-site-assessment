@@ -44,7 +44,7 @@ class AdminUsersScreen extends StatelessWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: users.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final user = users[index];
               return _UserAccessTile(user: user, roles: _roles);
@@ -174,7 +174,7 @@ class _UserAccessTileState extends State<_UserAccessTile> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: role,
+                    initialValue: role,
                     decoration: const InputDecoration(
                       labelText: 'Role',
                       prefixIcon: Icon(Icons.admin_panel_settings_outlined),

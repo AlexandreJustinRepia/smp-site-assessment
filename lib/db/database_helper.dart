@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -54,6 +54,7 @@ class DatabaseHelper {
       )
     ''');
     await _createPendingDeletesTable(db);
+    await _createCachedUserAccessTable(db);
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -76,6 +77,14 @@ class DatabaseHelper {
     if (oldVersion < 5) {
       await _createPendingDeletesTable(db);
     }
+    if (oldVersion < 6) {
+      await _createCachedUserAccessTable(db);
+    }
+    if (oldVersion >= 6 && oldVersion < 7) {
+      await db.execute(
+        'ALTER TABLE cached_user_access ADD COLUMN nameDirty INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _createPendingDeletesTable(Database db) async {
@@ -83,6 +92,20 @@ class DatabaseHelper {
       CREATE TABLE IF NOT EXISTS pending_assessment_deletes (
         firestoreId TEXT PRIMARY KEY,
         deletedAt TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createCachedUserAccessTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cached_user_access (
+        uid TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT '',
+        email TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'viewer',
+        approved INTEGER NOT NULL DEFAULT 0,
+        nameDirty INTEGER NOT NULL DEFAULT 0,
+        cachedAt TEXT NOT NULL
       )
     ''');
   }
@@ -180,6 +203,43 @@ class DatabaseHelper {
 
   Future<void> clearPendingDelete(String firestoreId) async {
     await _clearPendingDelete(firestoreId);
+  }
+
+  Future<void> cacheUserAccess(Map<String, dynamic> access) async {
+    final db = await database;
+    await db.insert(
+      'cached_user_access',
+      {
+        'uid': access['uid'],
+        'name': access['name'] ?? '',
+        'email': access['email'] ?? '',
+        'role': access['role'] ?? 'viewer',
+        'approved': access['approved'] == true ? 1 : 0,
+        'nameDirty': access['nameDirty'] == true ? 1 : 0,
+        'cachedAt': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>?> readCachedUserAccess(String uid) async {
+    final db = await database;
+    final result = await db.query(
+      'cached_user_access',
+      where: 'uid = ?',
+      whereArgs: [uid],
+      limit: 1,
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    return {
+      'uid': row['uid']?.toString() ?? '',
+      'name': row['name']?.toString() ?? '',
+      'email': row['email']?.toString() ?? '',
+      'role': row['role']?.toString() ?? 'viewer',
+      'approved': row['approved'] == 1,
+      'nameDirty': row['nameDirty'] == 1,
+    };
   }
 
   Future close() async {

@@ -49,9 +49,10 @@ class _LoadingScreenState extends State<LoadingScreen>
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) => const AuthGate(),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const AuthGate(),
         transitionDuration: const Duration(milliseconds: 280),
-        transitionsBuilder: (_, animation, __, child) {
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
       ),

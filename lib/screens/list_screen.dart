@@ -7,6 +7,7 @@ import '../services/user_access_service.dart';
 import 'admin_users_screen.dart';
 import 'form_screen.dart';
 import 'detail_screen.dart';
+import 'profile_screen.dart';
 
 class ListScreen extends StatefulWidget {
   final AppUserAccess access;
@@ -265,10 +266,96 @@ class _ListScreenState extends State<ListScreen> {
                     : const Icon(Icons.sync),
                 tooltip: 'Sync assessments',
               ),
-              IconButton(
-                onPressed: UserAccessService.instance.signOut,
-                icon: const Icon(Icons.logout),
-                tooltip: 'Sign out',
+              PopupMenuButton<String>(
+                tooltip: 'Profile',
+                offset: const Offset(0, 46),
+                color: Colors.white,
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                onSelected: (value) {
+                  if (value == 'profile') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProfileScreen(access: widget.access),
+                      ),
+                    );
+                  }
+                  if (value == 'logout') {
+                    UserAccessService.instance.signOut();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline,
+                          color: Color(0xFF1B5E20),
+                          size: 22,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Profile',
+                          style: TextStyle(
+                            color: Color(0xFF143D18),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.logout,
+                          color: Color(0xFFC62828),
+                          size: 22,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            color: Color(0xFF143D18),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8, left: 4),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFF9A825),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.22),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.account_circle,
+                      color: Color(0xFF1B5E20),
+                      size: 30,
+                    ),
+                  ),
+                ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
