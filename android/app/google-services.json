@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "552620587357",
+    "project_id": "smp-site-assessment",
+    "storage_bucket": "smp-site-assessment.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:552620587357:android:561a9fe333cf4eb19550b4",
+        "android_client_info": {
+          "package_name": "com.denrngp.bnbnp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjrW0CLppdX6jQFT3daKjIhSvFqYjZ2Gc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

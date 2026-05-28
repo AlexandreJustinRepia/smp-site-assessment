@@ -35,6 +35,10 @@ class InventoryRow {
 class Assessment {
   int? id;
 
+  /// The Firestore document ID for this record, or null if not yet synced.
+  /// Stored locally in SQLite; never written to Firestore itself.
+  String? firestoreId;
+
   // Header fields
   String gridNo;
   String centroidNo;
@@ -71,6 +75,7 @@ class Assessment {
 
   Assessment({
     this.id,
+    this.firestoreId,
     this.gridNo = '',
     this.centroidNo = '',
     this.elevation = '',
@@ -102,6 +107,7 @@ class Assessment {
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
+        if (firestoreId != null) 'firestoreId': firestoreId,
         'gridNo': gridNo,
         'centroidNo': centroidNo,
         'elevation': elevation,
@@ -124,6 +130,7 @@ class Assessment {
 
   factory Assessment.fromMap(Map<String, dynamic> map) => Assessment(
         id: map['id'] as int?,
+        firestoreId: map['firestoreId'] as String?,
         gridNo: map['gridNo'] ?? '',
         centroidNo: map['centroidNo'] ?? '',
         elevation: map['elevation'] ?? '',
@@ -146,6 +153,7 @@ class Assessment {
 
   Assessment copyWith({
     int? id,
+    String? firestoreId,
     String? gridNo,
     String? centroidNo,
     String? elevation,
@@ -167,6 +175,7 @@ class Assessment {
   }) =>
       Assessment(
         id: id ?? this.id,
+        firestoreId: firestoreId ?? this.firestoreId,
         gridNo: gridNo ?? this.gridNo,
         centroidNo: centroidNo ?? this.centroidNo,
         elevation: elevation ?? this.elevation,

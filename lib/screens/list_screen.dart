@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
-import '../services/backup_service.dart';
+import '../services/sync_service.dart';
 import 'form_screen.dart';
 import 'detail_screen.dart';
 
@@ -15,9 +16,11 @@ class ListScreen extends StatefulWidget {
 class _ListScreenState extends State<ListScreen> {
   List<Assessment> _assessments = [];
   bool _loading = true;
-  bool _backupBusy = false;
+  bool _syncBusy = false;
+  bool _isOnline = true;
   final _searchCtrl = TextEditingController();
-  final _backupService = BackupService();
+  final _syncService = SyncService();
+  late final Stream<List<ConnectivityResult>> _connectivityStream;
 
   List<Assessment> get _filteredAssessments {
     final query = _searchCtrl.text.trim().toLowerCase();
@@ -48,12 +51,32 @@ class _ListScreenState extends State<ListScreen> {
     super.initState();
     _searchCtrl.addListener(() => setState(() {}));
     _loadAssessments();
+    _initConnectivity();
+    _connectivityStream = Connectivity().onConnectivityChanged;
+    _connectivityStream.listen((results) {
+      if (!mounted) return;
+      setState(() {
+        _isOnline = results.contains(ConnectivityResult.mobile) ||
+            results.contains(ConnectivityResult.wifi) ||
+            results.contains(ConnectivityResult.ethernet);
+      });
+    });
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _initConnectivity() async {
+    final result = await Connectivity().checkConnectivity();
+    if (!mounted) return;
+    setState(() {
+      _isOnline = result.contains(ConnectivityResult.mobile) ||
+          result.contains(ConnectivityResult.wifi) ||
+          result.contains(ConnectivityResult.ethernet);
+    });
   }
 
   Future<void> _loadAssessments() async {
@@ -94,52 +117,76 @@ class _ListScreenState extends State<ListScreen> {
     );
   }
 
-  Future<void> _exportBackup() async {
-    setState(() => _backupBusy = true);
-    try {
-      await _backupService.exportBackup();
-      if (!mounted) return;
+  Future<void> _syncAssessments() async {
+    if (!_isOnline) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Backup exported with ${_assessments.length} record${_assessments.length == 1 ? '' : 's'}',
+          content: const Row(
+            children: [
+              Icon(Icons.wifi_off, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'No internet connection. Please connect and try again.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFE65100),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _backupBusy = false);
+      return;
     }
-  }
 
-  Future<void> _importBackup() async {
-    setState(() => _backupBusy = true);
+    setState(() => _syncBusy = true);
     try {
-      final result = await _backupService.importBackup();
+      final result = await _syncService.syncAssessments();
       if (!mounted) return;
-      if (result == null) {
-        return;
-      }
+      if (result == null) return;
       await _loadAssessments();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Imported ${result.imported}; skipped ${result.skipped} duplicate${result.skipped == 1 ? '' : 's'}',
+            'Sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded, ${result.skipped} skipped, ${result.total} total',
+          ),
+        ),
+      );
+    } on SyncNoInternetException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.wifi_off, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Text(
+                'No internet connection. Please connect and try again.',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFE65100),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Import failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sync failed: $e')));
     } finally {
-      if (mounted) setState(() => _backupBusy = false);
+      if (mounted) setState(() => _syncBusy = false);
     }
   }
 
@@ -188,14 +235,18 @@ class _ListScreenState extends State<ListScreen> {
             elevation: 4,
             actions: [
               IconButton(
-                onPressed: _backupBusy ? null : _importBackup,
-                icon: const Icon(Icons.upload_file),
-                tooltip: 'Import backup',
-              ),
-              IconButton(
-                onPressed: _backupBusy ? null : _exportBackup,
-                icon: const Icon(Icons.ios_share),
-                tooltip: 'Export backup',
+                onPressed: _syncBusy ? null : _syncAssessments,
+                icon: _syncBusy
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.sync),
+                tooltip: 'Sync assessments',
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -213,7 +264,7 @@ class _ListScreenState extends State<ListScreen> {
                     ),
                   ),
                   Text(
-                    'Site Monitoring Platform',
+                    'Biak-Na-Bato National Park (BNBNP)',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w400,
@@ -297,7 +348,9 @@ class _ListScreenState extends State<ListScreen> {
                               Text(
                                 'Site Assessment',
                                 style: TextStyle(
-                                  color: Color(0xFFF9A825).withValues(alpha: 0.85),
+                                  color: Color(
+                                    0xFFF9A825,
+                                  ).withValues(alpha: 0.85),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -330,7 +383,11 @@ class _ListScreenState extends State<ListScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.assessment, color: Color(0xFF1B5E20), size: 20),
+                  const Icon(
+                    Icons.assessment,
+                    color: Color(0xFF1B5E20),
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     isSearching
@@ -344,22 +401,35 @@ class _ListScreenState extends State<ListScreen> {
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F8E9),
+                      color: _isOnline
+                          ? const Color(0xFFF1F8E9)
+                          : const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_off, size: 14, color: Color(0xFF33691E)),
-                        SizedBox(width: 4),
+                        Icon(
+                          _isOnline ? Icons.cloud_done : Icons.wifi_off,
+                          size: 14,
+                          color: _isOnline
+                              ? const Color(0xFF33691E)
+                              : const Color(0xFFE65100),
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          'Offline',
+                          _isOnline ? 'Online' : 'Offline',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF33691E),
+                            color: _isOnline
+                                ? const Color(0xFF33691E)
+                                : const Color(0xFFE65100),
                           ),
                         ),
                       ],
@@ -377,7 +447,10 @@ class _ListScreenState extends State<ListScreen> {
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search assessments',
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF1B5E20)),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF1B5E20),
+                  ),
                   suffixIcon: isSearching
                       ? IconButton(
                           onPressed: _searchCtrl.clear,
@@ -423,7 +496,11 @@ class _ListScreenState extends State<ListScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.forest, size: 80, color: const Color(0xFF1B5E20).withValues(alpha: 0.25)),
+                    Icon(
+                      Icons.forest,
+                      size: 80,
+                      color: const Color(0xFF1B5E20).withValues(alpha: 0.25),
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       'No assessments yet',
@@ -436,7 +513,10 @@ class _ListScreenState extends State<ListScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Tap + to create your first site assessment',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
                   ],
                 ),
@@ -470,7 +550,10 @@ class _ListScreenState extends State<ListScreen> {
                       Text(
                         'Try another grid, location, date, team member, or land cover.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade400,
+                        ),
                       ),
                     ],
                   ),
@@ -479,192 +562,215 @@ class _ListScreenState extends State<ListScreen> {
             )
           else
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final a = filteredAssessments[index];
-                  final locationLine = [
-                    if (a.location.isNotEmpty) a.location,
-                    if (a.centroidNo.isNotEmpty) 'Centroid ${a.centroidNo}',
-                  ].join(' • ');
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final a = filteredAssessments[index];
+                final locationLine = [
+                  if (a.location.isNotEmpty) a.location,
+                  if (a.centroidNo.isNotEmpty) 'Centroid ${a.centroidNo}',
+                ].join(' • ');
 
-                  return Dismissible(
-                    key: Key('assessment_${a.id}'),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 24),
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade400,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.delete_forever, color: Colors.white, size: 28),
+                return Dismissible(
+                  key: Key('assessment_${a.id}'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 24),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
                     ),
-                    confirmDismiss: (direction) async {
-                      return await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          title: const Text('Delete Assessment'),
-                          content: const Text('Are you sure you want to delete this assessment?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancel'),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade400,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.delete_forever,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  confirmDismiss: (direction) async {
+                    return await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: const Text('Delete Assessment'),
+                        content: const Text(
+                          'Are you sure you want to delete this assessment?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
                             ),
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              style: TextButton.styleFrom(foregroundColor: Colors.red),
-                              child: const Text('Delete'),
-                            ),
-                          ],
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  onDismissed: (_) => _deleteAssessment(a),
+                  child: GestureDetector(
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DetailScreen(assessment: a),
                         ),
                       );
+                      if (!mounted) return;
+                      _loadAssessments();
                     },
-                    onDismissed: (_) => _deleteAssessment(a),
-                    child: GestureDetector(
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => DetailScreen(assessment: a)),
-                        );
-                        if (!mounted) return;
-                        _loadAssessments();
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border(
-                            left: BorderSide(
-                              color: const Color(0xFF1B5E20).withValues(alpha: 0.7),
-                              width: 4,
-                            ),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border(
+                          left: BorderSide(
+                            color: const Color(
+                              0xFF1B5E20,
+                            ).withValues(alpha: 0.7),
+                            width: 4,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 38,
-                                    height: 38,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F8E9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      _getLandCoverIcon(a.landCover),
-                                      style: const TextStyle(fontSize: 20),
-                                    ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F8E9),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          a.gridNo.isNotEmpty ? 'Grid: ${a.gridNo}' : 'No Grid No.',
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF1B5E20),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          locationLine.isNotEmpty
-                                              ? locationLine
-                                              : 'No location details',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  child: Text(
+                                    _getLandCoverIcon(a.landCover),
+                                    style: const TextStyle(fontSize: 20),
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F8E9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      a.date.isNotEmpty ? a.date : '—',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF33691E),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        a.gridNo.isNotEmpty
+                                            ? 'Grid: ${a.gridNo}'
+                                            : 'No Grid No.',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF1B5E20),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
-                                  if (a.landCover.isNotEmpty)
-                                    _AssessmentTag(label: a.landCover),
-                                  if (a.forestCondition.isNotEmpty)
-                                    _AssessmentTag(label: a.forestCondition),
-                                  if (a.inventoryRows.isNotEmpty)
-                                    _AssessmentTag(
-                                      label:
-                                          '${a.inventoryRows.length} inventory row${a.inventoryRows.length == 1 ? '' : 's'}',
-                                      icon: Icons.table_rows,
-                                    ),
-                                ],
-                              ),
-                              if (a.teamMembers.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.group,
-                                      size: 14,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        a.teamMembers,
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        locationLine.isNotEmpty
+                                            ? locationLine
+                                            : 'No location details',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 12,
                                           color: Colors.grey.shade600,
                                         ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F8E9),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    a.date.isNotEmpty ? a.date : '—',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF33691E),
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                if (a.landCover.isNotEmpty)
+                                  _AssessmentTag(label: a.landCover),
+                                if (a.forestCondition.isNotEmpty)
+                                  _AssessmentTag(label: a.forestCondition),
+                                if (a.inventoryRows.isNotEmpty)
+                                  _AssessmentTag(
+                                    label:
+                                        '${a.inventoryRows.length} inventory row${a.inventoryRows.length == 1 ? '' : 's'}',
+                                    icon: Icons.table_rows,
+                                  ),
+                              ],
+                            ),
+                            if (a.teamMembers.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.group,
+                                    size: 14,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      a.teamMembers,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
-                          ),
+                          ],
                         ),
                       ),
                     ),
-                  );
-                },
-                childCount: filteredAssessments.length,
-              ),
+                  ),
+                );
+              }, childCount: filteredAssessments.length),
             ),
           // Bottom padding
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
@@ -693,10 +799,7 @@ class _AssessmentTag extends StatelessWidget {
   final String label;
   final IconData? icon;
 
-  const _AssessmentTag({
-    required this.label,
-    this.icon,
-  });
+  const _AssessmentTag({required this.label, this.icon});
 
   @override
   Widget build(BuildContext context) {

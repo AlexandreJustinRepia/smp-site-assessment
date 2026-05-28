@@ -1,14 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'db/database_helper.dart';
 import 'screens/list_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _initializeFirebase();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
   runApp(const SiteAssessmentApp());
+}
+
+Future<void> _initializeFirebase() async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Sync in background — don't await so the app starts immediately
+    DatabaseHelper.instance.syncUnsyncedToFirestore();
+    DatabaseHelper.instance.syncFromFirestore();
+  } catch (_) {
+    // The app remains fully functional offline.
+  }
 }
 
 class SiteAssessmentApp extends StatelessWidget {
@@ -42,7 +59,9 @@ class SiteAssessmentApp extends StatelessWidget {
         ),
         cardTheme: CardThemeData(
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           color: Colors.white,
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -61,12 +80,17 @@ class SiteAssessmentApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: Color(0xFF1B5E20), width: 1.5),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
         ),
         snackBarTheme: SnackBarThemeData(
           backgroundColor: const Color(0xFF1B5E20),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       ),
       home: const ListScreen(),

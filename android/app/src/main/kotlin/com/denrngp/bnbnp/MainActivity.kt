@@ -1,4 +1,4 @@
-package com.example.smp_site_assessment
+package com.denrngp.bnbnp
 
 import io.flutter.embedding.android.FlutterActivity
 
