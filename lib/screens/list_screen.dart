@@ -240,19 +240,70 @@ class _ListScreenState extends State<ListScreen> {
             elevation: 4,
             actions: [
               if (widget.access.canManageUsers)
-                IconButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AdminUsersScreen(
-                          currentAccess: widget.access,
+                StreamBuilder<List<AppUserAccess>>(
+                  stream: UserAccessService.instance.watchUsers(),
+                  builder: (context, snapshot) {
+                    final users = snapshot.data ?? [];
+                    final pendingCount = users.where((u) => !u.approved).length;
+
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AdminUsersScreen(
+                                  currentAccess: widget.access,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.admin_panel_settings_outlined),
+                          tooltip: 'User access',
                         ),
-                      ),
+                        if (pendingCount > 0)
+                          Positioned(
+                            right: 4,
+                            top: 4,
+                            child: IgnorePointer(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD32F2F),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.25),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  '+$pendingCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.0,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   },
-                  icon: const Icon(Icons.admin_panel_settings_outlined),
-                  tooltip: 'User access',
                 ),
               IconButton(
                 onPressed: _syncBusy ? null : _syncAssessments,

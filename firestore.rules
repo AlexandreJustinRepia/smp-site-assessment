@@ -61,13 +61,13 @@ service cloud.firestore {
 
     match /assessments/{document=**} {
       allow read: if isApproved();
-      allow create, update: if hasRole('admin') || hasRole('editor');
+      allow create, update: if hasRole('admin') || hasRole('editor') || hasRole('access_manager');
       allow delete: if isAdmin();
     }
 
     match /site_assessments/{document=**} {
       allow read: if isApproved();
-      allow create, update: if hasRole('admin') || hasRole('editor');
+      allow create, update: if hasRole('admin') || hasRole('editor') || hasRole('access_manager');
       allow delete: if isAdmin();
     }
 

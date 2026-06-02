@@ -23,7 +23,7 @@ class AppUserAccess {
   bool get isAdmin => approved && role == 'admin';
   bool get isAccessManager => approved && role == 'access_manager';
   bool get canManageUsers => isAdmin || isAccessManager;
-  bool get canEdit => approved && (role == 'admin' || role == 'editor');
+  bool get canEdit => approved && (role == 'admin' || role == 'editor' || role == 'access_manager');
   bool get canDelete => isAdmin;
 
   factory AppUserAccess.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -145,6 +145,10 @@ class UserAccessService {
       'approved': approved,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  Future<void> deleteUser(String uid) async {
+    await _users.doc(uid).delete();
   }
 
   Future<void> _cacheRemoteAccess(User? user) async {

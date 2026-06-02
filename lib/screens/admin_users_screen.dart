@@ -110,6 +110,150 @@ class _UserAccessTileState extends State<_UserAccessTile> {
     }
   }
 
+  void _showApprovalModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Review Approval Status',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.grey.shade900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Set the approval status for ${widget.user.name.isEmpty ? 'this user' : widget.user.name} (${widget.user.email}).',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _save(approved: true);
+                  },
+                  icon: const Icon(Icons.check, color: Colors.white),
+                  label: const Text('Approve User'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1B5E20),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _save(approved: false);
+                  },
+                  icon: const Icon(Icons.close, color: Color(0xFFC62828)),
+                  label: const Text('Reject User'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFC62828),
+                    side: const BorderSide(color: Color(0xFFC62828)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+                if (widget.currentAccess.isAdmin && widget.user.role != 'admin') ...[
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _confirmDelete(context);
+                    },
+                    icon: const Icon(Icons.delete_forever, color: Colors.white),
+                    label: const Text('Delete User'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFC62828),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text('Delete User Account'),
+        content: Text(
+          'Are you sure you want to permanently delete the user account for ${widget.user.name.isEmpty ? 'this user' : widget.user.name}?\n\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFC62828),
+            ),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() => _busy = true);
+      try {
+        await UserAccessService.instance.deleteUser(widget.user.uid);
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Unable to delete user: $e'),
+            backgroundColor: const Color(0xFFC62828),
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+  }
+
+  String _formatRole(String role) {
+    switch (role) {
+      case 'access_manager':
+        return 'Access Manager';
+      case 'admin':
+        return 'Admin';
+      case 'editor':
+        return 'Editor';
+      case 'viewer':
+        return 'Viewer';
+      default:
+        return role;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
@@ -147,14 +291,39 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        user.name.isEmpty ? 'No name' : user.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              user.name.isEmpty ? 'No name' : user.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (!user.approved)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE65100),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'NEW',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -185,6 +354,15 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (widget.currentAccess.isAdmin && !adminProtected)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Color(0xFFC62828),
+                    ),
+                    tooltip: 'Delete User',
+                    onPressed: () => _confirmDelete(context),
                   ),
               ],
             ),
@@ -215,16 +393,22 @@ class _UserAccessTileState extends State<_UserAccessTile> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: role,
                     decoration: const InputDecoration(
                       labelText: 'Role',
                       prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                     items: roleOptions
                         .map(
                           (role) => DropdownMenuItem(
                             value: role,
-                            child: Text(role),
+                            child: Text(
+                              _formatRole(role),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
                         )
                         .toList(),
@@ -236,12 +420,28 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Switch(
-                  value: user.approved,
-                  onChanged:
-                      _busy || !canUpdateUser
-                          ? null
-                          : (value) => _save(approved: value),
+                ElevatedButton.icon(
+                  onPressed: _busy || !canUpdateUser
+                      ? null
+                      : () => _showApprovalModal(context),
+                  icon: Icon(
+                    user.approved ? Icons.verified : Icons.pending,
+                    size: 16,
+                  ),
+                  label: Text(user.approved ? 'Approved' : 'Review'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: user.approved
+                        ? const Color(0xFF1B5E20)
+                        : const Color(0xFFE65100),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
               ],
             ),
