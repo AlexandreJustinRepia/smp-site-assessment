@@ -172,7 +172,7 @@ class SyncService {
       downloaded++;
     }
 
-    final total = (await DatabaseHelper.instance.readAll()).length;
+    final total = localAssessments.length - deleted + downloaded;
     return SyncResult(
       uploaded: uploaded,
       downloaded: downloaded,

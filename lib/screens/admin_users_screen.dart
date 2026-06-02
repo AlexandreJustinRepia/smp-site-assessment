@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/user_access_service.dart';
 
-class AdminUsersScreen extends StatelessWidget {
+class AdminUsersScreen extends StatefulWidget {
   final AppUserAccess currentAccess;
 
   const AdminUsersScreen({
@@ -10,19 +10,32 @@ class AdminUsersScreen extends StatelessWidget {
     required this.currentAccess,
   });
 
+  @override
+  State<AdminUsersScreen> createState() => _AdminUsersScreenState();
+}
+
+class _AdminUsersScreenState extends State<AdminUsersScreen> {
   static const _adminRoles = ['viewer', 'editor', 'access_manager', 'admin'];
   static const _accessManagerRoles = ['viewer', 'editor', 'access_manager'];
 
+  late final Stream<List<AppUserAccess>> _usersStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _usersStream = UserAccessService.instance.watchUsers();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final roles = currentAccess.isAdmin ? _adminRoles : _accessManagerRoles;
+    final roles = widget.currentAccess.isAdmin ? _adminRoles : _accessManagerRoles;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Access'),
       ),
       body: StreamBuilder<List<AppUserAccess>>(
-        stream: UserAccessService.instance.watchUsers(),
+        stream: _usersStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -58,7 +71,7 @@ class AdminUsersScreen extends StatelessWidget {
               return _UserAccessTile(
                 user: user,
                 roles: roles,
-                currentAccess: currentAccess,
+                currentAccess: widget.currentAccess,
               );
             },
           );
@@ -169,7 +182,7 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
-                if (widget.currentAccess.isAdmin && widget.user.role != 'admin') ...[
+                if (widget.currentAccess.canManageUsers && widget.user.role != 'admin') ...[
                   const SizedBox(height: 10),
                   ElevatedButton.icon(
                     onPressed: () {
@@ -355,7 +368,7 @@ class _UserAccessTileState extends State<_UserAccessTile> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                else if (widget.currentAccess.isAdmin && !adminProtected)
+                else if (widget.currentAccess.canManageUsers && !adminProtected)
                   IconButton(
                     icon: const Icon(
                       Icons.delete_outline,

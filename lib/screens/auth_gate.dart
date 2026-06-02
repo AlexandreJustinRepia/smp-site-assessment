@@ -27,20 +27,35 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-class _AccessGate extends StatelessWidget {
+class _AccessGate extends StatefulWidget {
   final String? email;
 
   const _AccessGate({this.email});
 
   @override
+  State<_AccessGate> createState() => _AccessGateState();
+}
+
+class _AccessGateState extends State<_AccessGate> {
+  late final Future<AppUserAccess?> _cachedAccessFuture;
+  late final Stream<AppUserAccess?> _accessStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _cachedAccessFuture = UserAccessService.instance.readCachedCurrentAccess();
+    _accessStream = UserAccessService.instance.watchCurrentAccess();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<AppUserAccess?>(
-      future: UserAccessService.instance.readCachedCurrentAccess(),
+      future: _cachedAccessFuture,
       builder: (context, cachedSnapshot) {
         final cachedAccess = cachedSnapshot.data;
 
         return StreamBuilder<AppUserAccess?>(
-          stream: UserAccessService.instance.watchCurrentAccess(),
+          stream: _accessStream,
           builder: (context, accessSnapshot) {
             final access = accessSnapshot.data;
             if (access != null && access.approved) {
@@ -56,7 +71,7 @@ class _AccessGate extends StatelessWidget {
               return const _CenteredStatus(message: 'Loading permissions');
             }
 
-            return PendingApprovalScreen(email: email);
+            return PendingApprovalScreen(email: widget.email);
           },
         );
       },

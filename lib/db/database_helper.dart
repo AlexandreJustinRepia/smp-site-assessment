@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -7,6 +9,21 @@ import '../services/firestore_service.dart';
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
+
+  final _assessmentsController =
+      StreamController<List<Assessment>>.broadcast();
+
+  /// Reactive stream of all assessments. Emits whenever the local DB changes.
+  Stream<List<Assessment>> watchAll() => _assessmentsController.stream;
+
+  /// Push a fresh snapshot to all listeners.
+  Future<void> _notifyChange() async {
+    if (!_assessmentsController.hasListener) return;
+    final list = await readAll();
+    if (!_assessmentsController.isClosed) {
+      _assessmentsController.add(list);
+    }
+  }
 
   DatabaseHelper._init();
 
@@ -124,12 +141,15 @@ class DatabaseHelper {
     final id = await db.insert('assessments', local.toMap());
     // Push to Firestore in the background (won't block the UI)
     _syncToFirestore(local.copyWith(id: id));
+    unawaited(_notifyChange());
     return id;
   }
 
   Future<int> insertSynced(Assessment assessment) async {
     final db = await database;
-    return db.insert('assessments', assessment.toMap());
+    final id = await db.insert('assessments', assessment.toMap());
+    unawaited(_notifyChange());
+    return id;
   }
 
   Future<Assessment?> read(int id) async {
@@ -161,17 +181,20 @@ class DatabaseHelper {
       whereArgs: [local.id],
     );
     _syncToFirestore(local);
+    unawaited(_notifyChange());
     return rows;
   }
 
   Future<int> applyRemoteUpdate(Assessment assessment) async {
     final db = await database;
-    return db.update(
+    final rows = await db.update(
       'assessments',
       assessment.toMap(),
       where: 'id = ?',
       whereArgs: [assessment.id],
     );
+    unawaited(_notifyChange());
+    return rows;
   }
 
   Future<int> delete(int id) async {
@@ -182,11 +205,13 @@ class DatabaseHelper {
       await _queuePendingDelete(firestoreId);
       _deleteFromFirestore(firestoreId);
     }
-    return await db.delete(
+    final rows = await db.delete(
       'assessments',
       where: 'id = ?',
       whereArgs: [id],
     );
+    unawaited(_notifyChange());
+    return rows;
   }
 
   Future<List<String>> readPendingDeleteIds() async {
@@ -243,6 +268,7 @@ class DatabaseHelper {
   }
 
   Future close() async {
+    await _assessmentsController.close();
     final db = await database;
     db.close();
   }
@@ -258,28 +284,36 @@ class DatabaseHelper {
     try {
       final remote = await FirestoreService.instance.fetchAll();
       final local = await readAll();
+      final localById = {for (final a in local) a.firestoreId: a};
 
+      final db = await database;
       int imported = 0;
-      for (final remoteAssessment in remote) {
-        Assessment? localAssessment;
-        for (final assessment in local) {
-          if (assessment.firestoreId == remoteAssessment.firestoreId) {
-            localAssessment = assessment;
-            break;
+
+      // Batch all SQLite writes in a single transaction for speed.
+      await db.transaction((txn) async {
+        for (final remoteAssessment in remote) {
+          final localAssessment = localById[remoteAssessment.firestoreId];
+          if (localAssessment != null) {
+            if (_isNewer(
+              remoteAssessment.updatedAt,
+              localAssessment.updatedAt,
+            )) {
+              await txn.update(
+                'assessments',
+                remoteAssessment.copyWith(id: localAssessment.id).toMap(),
+                where: 'id = ?',
+                whereArgs: [localAssessment.id],
+              );
+              imported++;
+            }
+            continue;
           }
+          await txn.insert('assessments', remoteAssessment.toMap());
+          imported++;
         }
-        if (localAssessment != null) {
-          if (_isNewer(remoteAssessment.updatedAt, localAssessment.updatedAt)) {
-            await applyRemoteUpdate(
-              remoteAssessment.copyWith(id: localAssessment.id),
-            );
-            imported++;
-          }
-          continue;
-        }
-        await insertSynced(remoteAssessment);
-        imported++;
-      }
+      });
+
+      if (imported > 0) unawaited(_notifyChange());
       return imported;
     } catch (_) {
       return 0; // Silently fail — offline or Firestore unavailable
@@ -292,7 +326,11 @@ class DatabaseHelper {
     try {
       await _syncPendingDeletesToFirestore();
       final db = await database;
-      final unsynced = await db.query('assessments');
+      // Only upload records that have never been pushed to Firestore.
+      final unsynced = await db.query(
+        'assessments',
+        where: "firestoreId IS NULL OR firestoreId LIKE 'local_%'",
+      );
       for (final map in unsynced) {
         final assessment = Assessment.fromMap(map);
         await _syncToFirestore(assessment);

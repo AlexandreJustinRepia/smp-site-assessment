@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../db/database_helper.dart';
@@ -26,6 +28,9 @@ class _ListScreenState extends State<ListScreen> {
   final _searchCtrl = TextEditingController();
   final _syncService = SyncService();
   late final Stream<List<ConnectivityResult>> _connectivityStream;
+  late final Stream<List<AppUserAccess>> _usersStream;
+  late final Stream<List<Assessment>> _assessmentsStream;
+  StreamSubscription<List<Assessment>>? _assessmentsSub;
 
   List<Assessment> get _filteredAssessments {
     final query = _searchCtrl.text.trim().toLowerCase();
@@ -55,8 +60,8 @@ class _ListScreenState extends State<ListScreen> {
   void initState() {
     super.initState();
     _searchCtrl.addListener(() => setState(() {}));
-    _loadAssessments();
     _initConnectivity();
+    _usersStream = UserAccessService.instance.watchUsers();
     _connectivityStream = Connectivity().onConnectivityChanged;
     _connectivityStream.listen((results) {
       if (!mounted) return;
@@ -66,10 +71,29 @@ class _ListScreenState extends State<ListScreen> {
             results.contains(ConnectivityResult.ethernet);
       });
     });
+
+    // Subscribe to reactive DB stream — list updates automatically.
+    _assessmentsStream = DatabaseHelper.instance.watchAll();
+    _assessmentsSub = _assessmentsStream.listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _assessments = list;
+        _loading = false;
+      });
+    });
+    // Load the initial snapshot.
+    DatabaseHelper.instance.readAll().then((list) {
+      if (!mounted) return;
+      setState(() {
+        _assessments = list;
+        _loading = false;
+      });
+    });
   }
 
   @override
   void dispose() {
+    _assessmentsSub?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -84,16 +108,6 @@ class _ListScreenState extends State<ListScreen> {
     });
   }
 
-  Future<void> _loadAssessments() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-    final list = await DatabaseHelper.instance.readAll();
-    if (!mounted) return;
-    setState(() {
-      _assessments = list;
-      _loading = false;
-    });
-  }
 
   Future<void> _deleteAssessment(Assessment assessment) async {
     final deleted = assessment;
@@ -101,8 +115,7 @@ class _ListScreenState extends State<ListScreen> {
     if (id == null) return;
 
     await DatabaseHelper.instance.delete(id);
-    if (!mounted) return;
-    await _loadAssessments();
+    // List updates reactively — no manual reload needed.
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -115,7 +128,7 @@ class _ListScreenState extends State<ListScreen> {
           textColor: const Color(0xFFF9A825),
           onPressed: () async {
             await DatabaseHelper.instance.create(deleted);
-            _loadAssessments();
+            // List updates reactively.
           },
         ),
       ),
@@ -154,8 +167,7 @@ class _ListScreenState extends State<ListScreen> {
       final result = await _syncService.syncAssessments();
       if (!mounted) return;
       if (result == null) return;
-      await _loadAssessments();
-      if (!mounted) return;
+      // List updates reactively after sync writes to DB.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -241,7 +253,7 @@ class _ListScreenState extends State<ListScreen> {
             actions: [
               if (widget.access.canManageUsers)
                 StreamBuilder<List<AppUserAccess>>(
-                  stream: UserAccessService.instance.watchUsers(),
+                  stream: _usersStream,
                   builder: (context, snapshot) {
                     final users = snapshot.data ?? [];
                     final pendingCount = users.where((u) => !u.approved).length;
@@ -792,8 +804,7 @@ class _ListScreenState extends State<ListScreen> {
                           ),
                         ),
                       );
-                      if (!mounted) return;
-                      _loadAssessments();
+                      // List updates reactively — no reload needed.
                     },
                     child: Container(
                       margin: const EdgeInsets.symmetric(
@@ -950,8 +961,7 @@ class _ListScreenState extends State<ListScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const FormScreen()),
                 );
-                if (!mounted) return;
-                _loadAssessments();
+                // List updates reactively — no reload needed.
               },
               backgroundColor: const Color(0xFF1B5E20),
               foregroundColor: Colors.white,

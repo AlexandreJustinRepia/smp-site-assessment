@@ -108,7 +108,7 @@ service cloud.firestore {
           && request.resource.data.name.size() >= 2
         );
 
-      allow delete: if isAdmin() && !isProtectedAdminTarget();
+      allow delete: if canManageUsers() && !isProtectedAdminTarget();
     }
   }
 }
