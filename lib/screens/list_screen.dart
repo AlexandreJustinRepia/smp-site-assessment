@@ -29,37 +29,19 @@ class _ListScreenState extends State<ListScreen> {
   final _syncService = SyncService();
   late final Stream<List<ConnectivityResult>> _connectivityStream;
   late final Stream<List<AppUserAccess>> _usersStream;
-  late final Stream<List<Assessment>> _assessmentsStream;
-  StreamSubscription<List<Assessment>>? _assessmentsSub;
+  late final StreamSubscription<void> _dbSubscription;
+  final ScrollController _scrollController = ScrollController();
 
-  List<Assessment> get _filteredAssessments {
-    final query = _searchCtrl.text.trim().toLowerCase();
-    if (query.isEmpty) return _assessments;
-
-    return _assessments.where((assessment) {
-      final searchableText = [
-        assessment.gridNo,
-        assessment.centroidNo,
-        assessment.date,
-        assessment.location,
-        assessment.coordsTarget,
-        assessment.coordsActual,
-        assessment.teamMembers,
-        assessment.landCover,
-        assessment.treeCrownCover,
-        assessment.forestCondition,
-        assessment.threats,
-        assessment.restorationApproaches.join(' '),
-      ].join(' ').toLowerCase();
-
-      return searchableText.contains(query);
-    }).toList();
-  }
+  static const int _pageSize = 50;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(_onSearchChanged);
+    _scrollController.addListener(_onScroll);
     _initConnectivity();
     _usersStream = UserAccessService.instance.watchUsers();
     _connectivityStream = Connectivity().onConnectivityChanged;
@@ -72,30 +54,79 @@ class _ListScreenState extends State<ListScreen> {
       });
     });
 
-    // Subscribe to reactive DB stream — list updates automatically.
-    _assessmentsStream = DatabaseHelper.instance.watchAll();
-    _assessmentsSub = _assessmentsStream.listen((list) {
-      if (!mounted) return;
-      setState(() {
-        _assessments = list;
-        _loading = false;
-      });
+    // Subscribed to lightweight SQLite change stream — reload on database writes.
+    _dbSubscription = DatabaseHelper.instance.watchChanges().listen((_) {
+      _loadNextPage(reset: true);
     });
-    // Load the initial snapshot.
-    DatabaseHelper.instance.readAll().then((list) {
-      if (!mounted) return;
-      setState(() {
-        _assessments = list;
-        _loading = false;
-      });
-    });
+
+    // Initial page load
+    _loadNextPage(reset: true);
   }
 
   @override
   void dispose() {
-    _assessmentsSub?.cancel();
+    _dbSubscription.cancel();
+    _scrollController.dispose();
+    _debounceTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (currentScroll >= maxScroll * 0.9) {
+      _loadNextPage();
+    }
+  }
+
+  void _onSearchChanged() {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _loadNextPage(reset: true);
+    });
+  }
+
+  Future<void> _loadNextPage({bool reset = false}) async {
+    if (_loadingMore) return;
+    if (!reset && !_hasMore) return;
+
+    setState(() {
+      _loadingMore = true;
+      if (reset) {
+        _loading = true;
+        _assessments = [];
+        _hasMore = true;
+      }
+    });
+
+    try {
+      final query = _searchCtrl.text.trim();
+      final nextPage = await DatabaseHelper.instance.readPage(
+        limit: _pageSize,
+        offset: _assessments.length,
+        search: query.isEmpty ? null : query,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        if (reset) {
+          _assessments = nextPage;
+        } else {
+          _assessments.addAll(nextPage);
+        }
+        _hasMore = nextPage.length == _pageSize;
+        _loading = false;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadingMore = false;
+      });
+    }
   }
 
   Future<void> _initConnectivity() async {
@@ -238,11 +269,12 @@ class _ListScreenState extends State<ListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredAssessments = _filteredAssessments;
+    final filteredAssessments = _assessments;
     final isSearching = _searchCtrl.text.trim().isNotEmpty;
 
     return Scaffold(
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // Gradient AppBar
           SliverAppBar(
@@ -659,9 +691,10 @@ class _ListScreenState extends State<ListScreen> {
           ),
           // List body
           if (_loading)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF1B5E20)),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => const _SkeletonTile(),
+                childCount: 4,
               ),
             )
           else if (_assessments.isEmpty)
@@ -950,6 +983,15 @@ class _ListScreenState extends State<ListScreen> {
                 );
               }, childCount: filteredAssessments.length),
             ),
+          if (_loadingMore && filteredAssessments.isNotEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF1B5E20)),
+                ),
+              ),
+            ),
           // Bottom padding
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
@@ -1005,6 +1047,123 @@ class _AssessmentTag extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SkeletonTile extends StatefulWidget {
+  const _SkeletonTile();
+
+  @override
+  State<_SkeletonTile> createState() => _SkeletonTileState();
+}
+
+class _SkeletonTileState extends State<_SkeletonTile> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final opacity = 0.3 + (_controller.value * 0.4);
+        return Opacity(
+          opacity: opacity,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border(
+                left: BorderSide(
+                  color: Colors.grey.shade300,
+                  width: 4,
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            width: 150,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 60,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

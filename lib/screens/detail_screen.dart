@@ -749,6 +749,8 @@ class _DetailScreenState extends State<DetailScreen> {
               Icons.gps_fixed,
             ),
             _buildFieldRow('Team Members', a.teamMembers, Icons.group),
+            if (a.createdByEmail.isNotEmpty)
+              _buildFieldRow('Created By', a.createdByEmail, Icons.account_circle_outlined),
           ]),
 
           // Land Cover

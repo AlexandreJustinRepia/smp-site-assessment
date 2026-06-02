@@ -221,6 +221,8 @@ class SyncService {
       'restorationRationale': map['restorationRationale'] ?? '',
       'firestoreId': map['firestoreId'],
       'updatedAt': map['updatedAt'] ?? DateTime.now().toIso8601String(),
+      'createdByUid': map['createdByUid'] ?? '',
+      'createdByEmail': map['createdByEmail'] ?? '',
     });
 
     final inventory = map['inventory'];

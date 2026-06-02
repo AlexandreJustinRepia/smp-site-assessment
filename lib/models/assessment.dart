@@ -76,6 +76,10 @@ class Assessment {
   String restorationApproach;
   String restorationRationale;
 
+  // Audit fields
+  String createdByUid;
+  String createdByEmail;
+
   Assessment({
     this.id,
     this.firestoreId,
@@ -98,6 +102,8 @@ class Assessment {
     this.inventoryJson = '[]',
     this.restorationApproach = '',
     this.restorationRationale = '',
+    this.createdByUid = '',
+    this.createdByEmail = '',
   }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   List<InventoryRow> get inventoryRows {
@@ -148,6 +154,8 @@ class Assessment {
         'inventoryJson': inventoryJson,
         'restorationApproach': restorationApproach,
         'restorationRationale': restorationRationale,
+        'createdByUid': createdByUid,
+        'createdByEmail': createdByEmail,
       };
 
   factory Assessment.fromMap(Map<String, dynamic> map) => Assessment(
@@ -172,6 +180,8 @@ class Assessment {
         inventoryJson: map['inventoryJson'] ?? '[]',
         restorationApproach: map['restorationApproach'] ?? '',
         restorationRationale: map['restorationRationale'] ?? '',
+        createdByUid: map['createdByUid'] ?? '',
+        createdByEmail: map['createdByEmail'] ?? '',
       );
 
   Assessment copyWith({
@@ -196,6 +206,8 @@ class Assessment {
     String? inventoryJson,
     String? restorationApproach,
     String? restorationRationale,
+    String? createdByUid,
+    String? createdByEmail,
   }) =>
       Assessment(
         id: id ?? this.id,
@@ -219,5 +231,7 @@ class Assessment {
         inventoryJson: inventoryJson ?? this.inventoryJson,
         restorationApproach: restorationApproach ?? this.restorationApproach,
         restorationRationale: restorationRationale ?? this.restorationRationale,
+        createdByUid: createdByUid ?? this.createdByUid,
+        createdByEmail: createdByEmail ?? this.createdByEmail,
       );
 }

@@ -10,18 +10,15 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
-  final _assessmentsController =
-      StreamController<List<Assessment>>.broadcast();
+  final _changeController = StreamController<void>.broadcast();
 
-  /// Reactive stream of all assessments. Emits whenever the local DB changes.
-  Stream<List<Assessment>> watchAll() => _assessmentsController.stream;
+  /// Reactive stream that emits whenever the local DB changes.
+  Stream<void> watchChanges() => _changeController.stream;
 
-  /// Push a fresh snapshot to all listeners.
-  Future<void> _notifyChange() async {
-    if (!_assessmentsController.hasListener) return;
-    final list = await readAll();
-    if (!_assessmentsController.isClosed) {
-      _assessmentsController.add(list);
+  /// Trigger change notifications.
+  void _notifyChange() {
+    if (!_changeController.isClosed && _changeController.hasListener) {
+      _changeController.add(null);
     }
   }
 
@@ -38,7 +35,7 @@ class DatabaseHelper {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -67,7 +64,9 @@ class DatabaseHelper {
         threats TEXT NOT NULL DEFAULT '',
         inventoryJson TEXT NOT NULL DEFAULT '[]',
         restorationApproach TEXT NOT NULL DEFAULT '',
-        restorationRationale TEXT NOT NULL DEFAULT ''
+        restorationRationale TEXT NOT NULL DEFAULT '',
+        createdByUid TEXT NOT NULL DEFAULT '',
+        createdByEmail TEXT NOT NULL DEFAULT ''
       )
     ''');
     await _createPendingDeletesTable(db);
@@ -100,6 +99,14 @@ class DatabaseHelper {
     if (oldVersion >= 6 && oldVersion < 7) {
       await db.execute(
         'ALTER TABLE cached_user_access ADD COLUMN nameDirty INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (oldVersion < 8) {
+      await db.execute(
+        'ALTER TABLE assessments ADD COLUMN createdByUid TEXT NOT NULL DEFAULT ""',
+      );
+      await db.execute(
+        'ALTER TABLE assessments ADD COLUMN createdByEmail TEXT NOT NULL DEFAULT ""',
       );
     }
   }
@@ -141,14 +148,14 @@ class DatabaseHelper {
     final id = await db.insert('assessments', local.toMap());
     // Push to Firestore in the background (won't block the UI)
     _syncToFirestore(local.copyWith(id: id));
-    unawaited(_notifyChange());
+    _notifyChange();
     return id;
   }
 
   Future<int> insertSynced(Assessment assessment) async {
     final db = await database;
     final id = await db.insert('assessments', assessment.toMap());
-    unawaited(_notifyChange());
+    _notifyChange();
     return id;
   }
 
@@ -169,6 +176,47 @@ class DatabaseHelper {
     return result.map((map) => Assessment.fromMap(map)).toList();
   }
 
+  Future<List<Assessment>> readPage({
+    required int limit,
+    required int offset,
+    String? search,
+  }) async {
+    final db = await database;
+    if (search == null || search.trim().isEmpty) {
+      final result = await db.query(
+        'assessments',
+        orderBy: 'id DESC',
+        limit: limit,
+        offset: offset,
+      );
+      return result.map((map) => Assessment.fromMap(map)).toList();
+    }
+
+    final queryStr = '%${search.trim().toLowerCase()}%';
+    final result = await db.query(
+      'assessments',
+      where: '''
+        gridNo LIKE ? OR
+        centroidNo LIKE ? OR
+        location LIKE ? OR
+        coordsTarget LIKE ? OR
+        coordsActual LIKE ? OR
+        teamMembers LIKE ? OR
+        landCover LIKE ? OR
+        treeCrownCover LIKE ? OR
+        forestCondition LIKE ? OR
+        threats LIKE ? OR
+        restorationApproach LIKE ? OR
+        restorationRationale LIKE ?
+      ''',
+      whereArgs: List.filled(12, queryStr),
+      orderBy: 'id DESC',
+      limit: limit,
+      offset: offset,
+    );
+    return result.map((map) => Assessment.fromMap(map)).toList();
+  }
+
   Future<int> update(Assessment assessment) async {
     final db = await database;
     final local = assessment.copyWith(
@@ -181,7 +229,7 @@ class DatabaseHelper {
       whereArgs: [local.id],
     );
     _syncToFirestore(local);
-    unawaited(_notifyChange());
+    _notifyChange();
     return rows;
   }
 
@@ -193,7 +241,7 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [assessment.id],
     );
-    unawaited(_notifyChange());
+    _notifyChange();
     return rows;
   }
 
@@ -210,7 +258,7 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
-    unawaited(_notifyChange());
+    _notifyChange();
     return rows;
   }
 
@@ -268,7 +316,7 @@ class DatabaseHelper {
   }
 
   Future close() async {
-    await _assessmentsController.close();
+    await _changeController.close();
     final db = await database;
     db.close();
   }
@@ -313,7 +361,7 @@ class DatabaseHelper {
         }
       });
 
-      if (imported > 0) unawaited(_notifyChange());
+      if (imported > 0) _notifyChange();
       return imported;
     } catch (_) {
       return 0; // Silently fail — offline or Firestore unavailable

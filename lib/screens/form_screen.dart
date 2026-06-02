@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../db/database_helper.dart';
 import '../models/assessment.dart';
+import '../services/user_access_service.dart';
 import 'form_sections/forest_condition_section.dart';
 import 'form_sections/forest_litter_section.dart';
 import 'form_sections/inventory_section.dart';
@@ -236,6 +237,10 @@ class _FormScreenState extends State<FormScreen> {
 
     setState(() => _saving = true);
 
+    final currentUser = UserAccessService.instance.currentUser;
+    final createdByUid = widget.assessment?.createdByUid ?? currentUser?.uid ?? '';
+    final createdByEmail = widget.assessment?.createdByEmail ?? currentUser?.email ?? '';
+
     final assessment = Assessment(
       id: widget.assessment?.id,
       firestoreId: widget.assessment?.firestoreId,
@@ -256,6 +261,8 @@ class _FormScreenState extends State<FormScreen> {
       forestLitterAvgDepth: _litterAvgDepthCtrl.text.trim(),
       threats: _threatsCtrl.text.trim(),
       restorationRationale: '',
+      createdByUid: createdByUid,
+      createdByEmail: createdByEmail,
     );
     assessment.setRestorationApproaches(_restorationApproaches);
     assessment.setInventoryRows(

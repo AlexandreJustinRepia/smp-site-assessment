@@ -57,23 +57,46 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
           final users = snapshot.data ?? [];
           if (users.isEmpty) {
-            return const Center(
-              child: Text('No users yet'),
+            return RefreshIndicator(
+              color: const Color(0xFF1B5E20),
+              onRefresh: () async {
+                setState(() {
+                  _usersStream = UserAccessService.instance.watchUsers();
+                });
+                await Future.delayed(const Duration(seconds: 1));
+              },
+              child: const SingleChildScrollView(
+                physics: AlwaysScrollableScrollPhysics(),
+                child: Center(
+                  heightFactor: 10,
+                  child: Text('No users yet'),
+                ),
+              ),
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: users.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final user = users[index];
-              return _UserAccessTile(
-                user: user,
-                roles: roles,
-                currentAccess: widget.currentAccess,
-              );
+          return RefreshIndicator(
+            color: const Color(0xFF1B5E20),
+            onRefresh: () async {
+              setState(() {
+                _usersStream = UserAccessService.instance.watchUsers();
+              });
+              await Future.delayed(const Duration(seconds: 1));
             },
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: users.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final user = users[index];
+                return _UserAccessTile(
+                  user: user,
+                  roles: roles,
+                  currentAccess: widget.currentAccess,
+                );
+              },
+            ),
           );
         },
       ),
@@ -110,12 +133,27 @@ class _UserAccessTileState extends State<_UserAccessTile> {
         role: role ?? widget.user.role,
         approved: approved ?? widget.user.approved,
       );
+      if (!mounted) return;
+      String msg = 'User updated successfully';
+      if (approved != null) {
+        msg = approved ? 'User approved successfully!' : 'User rejected successfully!';
+      } else if (role != null) {
+        msg = 'User role updated to ${_formatRole(role)}';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: const Color(0xFF1B5E20),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Unable to update user: $e'),
           backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -239,11 +277,19 @@ class _UserAccessTileState extends State<_UserAccessTile> {
       setState(() => _busy = true);
       try {
         await UserAccessService.instance.deleteUser(widget.user.uid);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('User deleted successfully!'),
+            backgroundColor: Color(0xFF1B5E20),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       } catch (e) {
         messenger.showSnackBar(
           SnackBar(
             content: Text('Unable to delete user: $e'),
             backgroundColor: const Color(0xFFC62828),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       } finally {
