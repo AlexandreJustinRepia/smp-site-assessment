@@ -48,7 +48,8 @@ class _ListScreenState extends State<ListScreen> {
     _connectivityStream.listen((results) {
       if (!mounted) return;
       setState(() {
-        _isOnline = results.contains(ConnectivityResult.mobile) ||
+        _isOnline =
+            results.contains(ConnectivityResult.mobile) ||
             results.contains(ConnectivityResult.wifi) ||
             results.contains(ConnectivityResult.ethernet);
       });
@@ -133,12 +134,12 @@ class _ListScreenState extends State<ListScreen> {
     final result = await Connectivity().checkConnectivity();
     if (!mounted) return;
     setState(() {
-      _isOnline = result.contains(ConnectivityResult.mobile) ||
+      _isOnline =
+          result.contains(ConnectivityResult.mobile) ||
           result.contains(ConnectivityResult.wifi) ||
           result.contains(ConnectivityResult.ethernet);
     });
   }
-
 
   Future<void> _deleteAssessment(Assessment assessment) async {
     final deleted = assessment;
@@ -326,7 +327,9 @@ class _ListScreenState extends State<ListScreen> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.25),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.25,
+                                      ),
                                       blurRadius: 4,
                                       offset: const Offset(0, 2),
                                     ),
@@ -409,11 +412,7 @@ class _ListScreenState extends State<ListScreen> {
                     value: 'logout',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.logout,
-                          color: Color(0xFFC62828),
-                          size: 22,
-                        ),
+                        Icon(Icons.logout, color: Color(0xFFC62828), size: 22),
                         SizedBox(width: 12),
                         Text(
                           'Logout',
@@ -467,15 +466,6 @@ class _ListScreenState extends State<ListScreen> {
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                       letterSpacing: 0.5,
-                    ),
-                  ),
-                  Text(
-                    'Biak-Na-Bato National Park (BNBNP)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                      color: Color(0xFFF9A825),
-                      letterSpacing: 0.3,
                     ),
                   ),
                 ],
@@ -1058,7 +1048,8 @@ class _SkeletonTile extends StatefulWidget {
   State<_SkeletonTile> createState() => _SkeletonTileState();
 }
 
-class _SkeletonTileState extends State<_SkeletonTile> with SingleTickerProviderStateMixin {
+class _SkeletonTileState extends State<_SkeletonTile>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -1091,10 +1082,7 @@ class _SkeletonTileState extends State<_SkeletonTile> with SingleTickerProviderS
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border(
-                left: BorderSide(
-                  color: Colors.grey.shade300,
-                  width: 4,
-                ),
+                left: BorderSide(color: Colors.grey.shade300, width: 4),
               ),
             ),
             child: Column(

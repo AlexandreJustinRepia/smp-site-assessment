@@ -62,13 +62,13 @@ service cloud.firestore {
     match /assessments/{document=**} {
       allow read: if isApproved();
       allow create, update: if hasRole('admin') || hasRole('editor') || hasRole('access_manager');
-      allow delete: if isAdmin();
+      allow delete: if hasRole('admin') || hasRole('editor') || hasRole('access_manager');
     }
 
     match /site_assessments/{document=**} {
       allow read: if isApproved();
       allow create, update: if hasRole('admin') || hasRole('editor') || hasRole('access_manager');
-      allow delete: if isAdmin();
+      allow delete: if hasRole('admin') || hasRole('editor') || hasRole('access_manager');
     }
 
     match /users/{userId} {
@@ -108,7 +108,7 @@ service cloud.firestore {
           && request.resource.data.name.size() >= 2
         );
 
-      allow delete: if canManageUsers() && !isProtectedAdminTarget();
+      allow delete: if isAdmin() && !isProtectedAdminTarget();
     }
   }
 }

@@ -24,7 +24,7 @@ class AppUserAccess {
   bool get isAccessManager => approved && role == 'access_manager';
   bool get canManageUsers => isAdmin || isAccessManager;
   bool get canEdit => approved && (role == 'admin' || role == 'editor' || role == 'access_manager');
-  bool get canDelete => isAdmin;
+  bool get canDelete => approved && (role == 'admin' || role == 'editor' || role == 'access_manager');
 
   factory AppUserAccess.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
